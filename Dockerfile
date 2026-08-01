@@ -12,9 +12,7 @@ COPY . .
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Install PHPMailer dependencies (if needed)
-RUN if [ -f PHPMailer/composer.json ]; then \
-    cd PHPMailer && composer install --no-dev --optimize-autoloader; \
-    fi
+
 
 EXPOSE 8080
 
