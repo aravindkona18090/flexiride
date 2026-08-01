@@ -1,8 +1,5 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require 'vendor/autoload.php';
+require 'resend.php';
 require 'db.php';
 session_start();
 
@@ -14,6 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // Fetch ride ID from query parameters
 $ride_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+
 if (!$ride_id) {
     echo "Invalid ride ID.";
     exit();
@@ -34,119 +32,145 @@ if (!$ride) {
 
 // Handle the form submission
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
     $origin = trim($_POST['origin']);
     $destination = trim($_POST['destination']);
     $ride_date = $_POST['ride_date'];
-    $ride_time = $_POST['ride_time']; // Get ride time from the form
+    $ride_time = $_POST['ride_time'];
     $seats_available = (int)$_POST['seats_available'];
 
-    // Check for missing or invalid values
     if (empty($origin) || empty($destination) || empty($ride_date) || empty($ride_time)) {
+
         $error = "All fields are required.";
+
     } else {
-        // Update the ride in the database
-        $sql = "UPDATE rides 
-                SET origin = ?, destination = ?, ride_date = ?, ride_time = ?, seats_available = ? 
+
+        $sql = "UPDATE rides
+                SET origin = ?, destination = ?, ride_date = ?, ride_time = ?, seats_available = ?
                 WHERE id = ? AND user_id = ?";
+
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssiii", $origin, $destination, $ride_date, $ride_time, $seats_available, $ride_id, $_SESSION['user_id']);
+        $stmt->bind_param(
+            "ssssiii",
+            $origin,
+            $destination,
+            $ride_date,
+            $ride_time,
+            $seats_available,
+            $ride_id,
+            $_SESSION['user_id']
+        );
 
         if ($stmt->execute()) {
-            // Fetch emails of users with bookings on this ride
-            $sql = "SELECT booked_email ,posted_email FROM bookings WHERE ride_id = ?";
+
+            // Fetch booked users
+            $sql = "SELECT booked_email FROM bookings WHERE ride_id = ?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $ride_id);
             $stmt->execute();
             $result = $stmt->get_result();
 
             $emails = [];
+
             while ($row = $result->fetch_assoc()) {
-                $emails[] = $row['booked_email'];
-                
+                if (!empty($row['booked_email'])) {
+                    $emails[$row['booked_email']] = true;
+                }
             }
-            if(isset($_SESSION['email'])){
-            $posted_email = $_SESSION['email'];
+
             $stmt->close();
-            echo "<script>alert($posted_email);</script>";
-            $mail = new PHPMailer(true);
-            try {
-                $mail->isSMTP();
-                $mail->Host = 'smtp.gmail.com';
-                $mail->SMTPAuth = true;
-                $mail->Username = 'flexiride247@gmail.com';
-                $mail->Password = 'lhyzlfabuyopgkqo';
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port = 587;
 
-                $mail->setFrom('flexiride247@gmail.com', 'FlexiRide');
-                $mail->addAddress($posted_email);
-                $mail->isHTML(true);
-                $mail->Subject = 'Ride Update Notification';
-                $mail->Body = "<h2>Dear User,</h2>
-                    <p>The ride you posted has been updated with the following details:</p>
-                    <ul>
-                        <li><strong>Origin:</strong> $origin</li>
-                        <li><strong>Destination:</strong> $destination</li>
-                        <li><strong>Ride Date:</strong> $ride_date</li>
-                        <li><strong>Ride Time:</strong> $ride_time</li>
-                        <li><strong>Seats Available:</strong> $seats_available</li>
-                    </ul>
-                    <p>For Queries, please visit our website.</p>
-                    <p>Thank you for choosing FlexiRide!</p>
-                    <p>Regards,<br>FlexiRide Team</p>";
+            // Notify Ride Owner
+            if (isset($_SESSION['email']) && !empty($_SESSION['email'])) {
 
-                $mail->send();
-            } catch (Exception $e) {
-                echo "Error sending email: {$mail->ErrorInfo}";
-            }
-        }
-            if (!empty($emails)) {
-                // Send email notifications
-                $mail = new PHPMailer(true);
+                $posted_email = $_SESSION['email'];
+
+                $ownerBody = "
+                <h2>Ride Updated Successfully</h2>
+
+                <p>Your posted ride has been updated.</p>
+
+                <ul>
+                    <li><strong>Origin:</strong> {$origin}</li>
+                    <li><strong>Destination:</strong> {$destination}</li>
+                    <li><strong>Ride Date:</strong> {$ride_date}</li>
+                    <li><strong>Ride Time:</strong> {$ride_time}</li>
+                    <li><strong>Seats Available:</strong> {$seats_available}</li>
+                </ul>
+
+                <p>Thank you for using <strong>FlexiRide</strong>.</p>
+
+                <p>Regards,<br>FlexiRide Team</p>
+                ";
+
                 try {
-                    $mail->isSMTP();
-                    $mail->Host = 'smtp.gmail.com';
-                    $mail->SMTPAuth = true;
-                    $mail->Username = 'flexiride247@gmail.com';
-                    $mail->Password = 'lhyzlfabuyopgkqo';
-                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                    $mail->Port = 587;
 
-                    $mail->setFrom('flexiride247@gmail.com', 'FlexiRide');
+                    sendResendEmail(
+                        $posted_email,
+                        "Ride Owner",
+                        "Ride Updated Successfully",
+                        $ownerBody
+                    );
 
-                    foreach ($emails as $email) {
-                        $mail->addAddress($email);
-                    }
-
-                    $mail->isHTML(true);
-                    $mail->Subject = 'Ride Update Notification';
-                    $mail->Body = "<h2>Dear User,</h2>
-                        <p>The ride you booked has been updated with the following details:</p>
-                        <ul>
-                            <li><strong>Origin:</strong> $origin</li>
-                            <li><strong>Destination:</strong> $destination</li>
-                            <li><strong>Ride Date:</strong> $ride_date</li>
-                            <li><strong>Ride Time:</strong> $ride_time</li>
-                            <li><strong>Seats Available:</strong> $seats_available</li>
-                        </ul>
-                        <p>For further updates or to cancel, please visit our website.</p>
-                        <p>Thank you for choosing FlexiRide!</p>
-                        <p>Regards,<br>FlexiRide Team</p>";
-
-                    $mail->send();
                 } catch (Exception $e) {
-                    echo "Error sending email: {$mail->ErrorInfo}";
+
+                    error_log("Resend Error: " . $e->getMessage());
+
+                }
+            }
+
+            // Notify all booked users
+            if (!empty($emails)) {
+
+                $userBody = "
+                <h2>Ride Update Notification</h2>
+
+                <p>The ride you booked has been updated.</p>
+
+                <ul>
+                    <li><strong>Origin:</strong> {$origin}</li>
+                    <li><strong>Destination:</strong> {$destination}</li>
+                    <li><strong>Ride Date:</strong> {$ride_date}</li>
+                    <li><strong>Ride Time:</strong> {$ride_time}</li>
+                    <li><strong>Seats Available:</strong> {$seats_available}</li>
+                </ul>
+
+                <p>Please check your booking details before travelling.</p>
+
+                <p>Thank you for choosing <strong>FlexiRide</strong>.</p>
+
+                <p>Regards,<br>FlexiRide Team</p>
+                ";
+
+                foreach (array_keys($emails) as $email) {
+
+                    try {
+
+                        sendResendEmail(
+                            $email,
+                            "FlexiRide User",
+                            "Ride Update Notification",
+                            $userBody
+                        );
+
+                    } catch (Exception $e) {
+
+                        error_log("Resend Error: " . $e->getMessage());
+
+                    }
                 }
             }
 
             header("Location: ride_edited.php");
             exit();
+
         } else {
+
             $error = "Error updating ride: " . $stmt->error;
+
         }
     }
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">

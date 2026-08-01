@@ -1,37 +1,46 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require 'resend.php';
 include 'db.php';
-require 'vendor/autoload.php'; // Include PHPMailer via Composer autoload
-
 session_start();
 
 // Function to send OTP using PHPMailer
-function sendOtp($email, $otp) {
-    $mail = new PHPMailer(true);
+function sendOtp($email, $otp)
+{
+    $emailBody = "
+    <h2>OTP Verification</h2>
+
+    <p>Hello,</p>
+
+    <p>Your OTP for verification is:</p>
+
+    <h1 style='font-size:32px;color:#2563eb;letter-spacing:5px;'>{$otp}</h1>
+
+    <p>This OTP is valid for 5 minutes.</p>
+
+    <p><strong>Do not share this OTP with anyone.</strong></p>
+
+    <br>
+
+    <p>Regards,<br><strong>FlexiRide Team</strong></p>
+    ";
 
     try {
-        // SMTP server configuration
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com'; // Gmail SMTP server
-        $mail->SMTPAuth = true;
-        $mail->Username = 'flexiride247@gmail.com'; // Your email
-        $mail->Password = 'lhyzlfabuyopgkqo'; // Your app password
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
 
-        $mail->setFrom('flexiride247@gmail.com', 'FlexiRide');
-        $mail->addAddress($email);
+        sendResendEmail(
+            $email,
+            "FlexiRide User",
+            "Your OTP for Verification",
+            $emailBody
+        );
 
-        $mail->isHTML(true);
-        $mail->Subject = 'Your OTP for Verification';
-        $mail->Body = "Hello,<br>Your OTP for verification is: <b>$otp</b><br>Please do not share this OTP.";
-
-        $mail->send();
         return true;
+
     } catch (Exception $e) {
-        error_log("PHPMailer Error: " . $mail->ErrorInfo);
+
+        error_log("Resend Error: " . $e->getMessage());
+
         return false;
+
     }
 }
 $home = false;
@@ -77,38 +86,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   $username = $_GET['name'];
                   $hashed_password = $_GET['password'];
                   $phone = $_GET['phone'];
-                  try{
-                    $mail = new PHPMailer(true);
-        // SMTP s$mail = new PHPMailer(true);
-    $mail->isSMTP();
-    $mail->Host = 'smtp.gmail.com';              
-    $mail->SMTPAuth = true;                        
-    $mail->Username = 'flexiride247@gmail.com';   
-    $mail->Password = 'lhyzlfabuyopgkqo';         
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-    $mail->Port = 587;                            
-    $mail->setFrom('flexiride247@gmail.com', 'FlexiRide'); 
-    $mail->addAddress($email);   
-    $mail->isHTML(true); 
-    $mail->Subject = "FlexiRide Registration Successful – Explore Your Benefits!";
-    $mail->Body = 
-        "<h2>Dear User,</h2>
-<p>You have successfully registered on <strong>FlexiRide</strong>. Welcome to our community!</p>
-<h3>Account Details:</h3>
-<ul>
-    <li><strong>Registered Email:</strong> $email</li>
-</ul>
-<p>Thank you for choosing FlexiRide. Explore our platform to post rides, find carpool partners, or manage your trips with ease.</p>
-<p>If you have any questions, feel free to reach out to us at flexiride247@gmail.com.</p>
-<p>Drive safe and enjoy the journey!</p>
-<p>Regards,<br>FlexiRide Team</p>";
+                  $emailBody = "
+<h2>Welcome to FlexiRide!</h2>
 
-    $mail->send();
-                  } catch (Exception $e) {
-                    $errorMessage = "Error sending email: {$mail->ErrorInfo}";
-                }
-                  $sql = "INSERT INTO users (name, email, password, phone) VALUES ('$username', '$email', '$hashed_password', '$phone')";
-                  $conn->query($sql);
+<p>Dear User,</p>
+
+<p>Your registration has been completed successfully.</p>
+
+<h3>Account Details</h3>
+
+<ul>
+    <li><strong>Registered Email:</strong> {$email}</li>
+</ul>
+
+<p>Thank you for joining <strong>FlexiRide</strong>.</p>
+
+<p>You can now:</p>
+
+<ul>
+    <li>Post rides</li>
+    <li>Book rides</li>
+    <li>Manage your trips</li>
+    <li>Use emergency features</li>
+</ul>
+
+<p>We wish you safe and enjoyable journeys.</p>
+
+<p>Regards,<br><strong>FlexiRide Team</strong></p>
+";
+
+$sql = "INSERT INTO users (name, email, password, phone)
+        VALUES ('$username', '$email', '$hashed_password', '$phone')";
+
+if ($conn->query($sql) === TRUE) {
+
+    try {
+
+        sendResendEmail(
+            $email,
+            $username,
+            "Welcome to FlexiRide!",
+            $emailBody
+        );
+
+    } catch (Exception $e) {
+
+        error_log("Resend Error: " . $e->getMessage());
+
+    }
+
+} else {
+
+    $errorMessage = "Registration failed. Please try again.";
+    $home = false;
+
+}
                 }
                 
                

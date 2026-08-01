@@ -1,50 +1,63 @@
 <?php
 session_start();
 include 'db.php';
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-require 'vendor\autoload.php';
-if($_SERVER["REQUEST_METHOD"]=="POST"){
-    $name=$_POST["name"];
-    $email=$_POST["email"];
-    $feedback=$_POST["Feedback"];
-    $sql = "INSERT INTO feedback(name, email, feedback) VALUES('$name', '$email', '$feedback')";
+require 'resend.php';
 
-    if ($conn->query($sql) === TRUE) 
-    {
-        try{
-            $mail = new PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';              
-            $mail->SMTPAuth = true;                        
-            $mail->Username = 'flexiride247@gmail.com';   
-            $mail->Password = 'lhyzlfabuyopgkqo';         
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-            $mail->Port = 587;                            
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-            $mail->setFrom('flexiride247@gmail.com', 'FlexiRide'); 
-        $mail->addAddress("feedbackflexiride@gmail.com");
-        $mail->isHTML(true);
-        $mail->Subject = "Feedback";
-        $mail->Body = "
-                <h3>New Feedback Received</h3>
-                <p><strong>Name:</strong> $name</p>
-                <p><strong>Email:</strong> $email</p>
-                <p><strong>Feedback:</strong> $feedback</p>
-            ";
-        $mail->send();
+    $name = trim($_POST["name"]);
+    $email = trim($_POST["email"]);
+    $feedback = trim($_POST["Feedback"]);
+
+    $sql = "INSERT INTO feedback(name, email, feedback)
+            VALUES('$name', '$email', '$feedback')";
+
+    if ($conn->query($sql) === TRUE) {
+
+        $emailBody = "
+        <h2>New Feedback Received</h2>
+
+        <p><strong>Name:</strong> {$name}</p>
+
+        <p><strong>Email:</strong> {$email}</p>
+
+        <p><strong>Feedback:</strong></p>
+
+        <div style='padding:12px;border:1px solid #ddd;border-radius:6px;background:#f9f9f9;'>
+            {$feedback}
+        </div>
+
+        <br>
+
+        <p>This feedback was submitted through the <strong>FlexiRide</strong> website.</p>
+        ";
+
+        try {
+
+            sendResendEmail(
+                "feedbackflexiride@gmail.com",
+                "FlexiRide Feedback",
+                "New Feedback Received",
+                $emailBody
+            );
+
+            echo "<script>alert('Feedback submitted successfully. Thank you!');</script>";
+
+        } catch (Exception $e) {
+
+            error_log("Resend Error: " . $e->getMessage());
+
+            // Feedback is already saved in the database.
+            echo "<script>alert('Feedback saved successfully, but email notification could not be sent.');</script>";
+
         }
-        catch(Exception $e){
-            echo "<script>alert('Feed back saved but error ouured in sending email:$e');</script>";
-            echo "<script> alert('Feed back sent succcessfully');</script>";
-        }
-        } 
-    else 
-    {
+
+    } else {
+
         echo "<script>alert('Feedback not sent');</script>";
+
     }
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">

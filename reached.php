@@ -1,56 +1,64 @@
 <?php
-// Include PHPMailer classes (Make sure PHPMailer is in the correct path)
-require 'PHPMailer/src/Exception.php';
-require 'PHPMailer/src/PHPMailer.php';
-require 'PHPMailer/src/SMTP.php';
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require 'resend.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Get data from the AJAX request (since it's sent as JSON, not as POST data)
+
+    // Get JSON data
     $data = json_decode(file_get_contents("php://input"), true);
+
     $latitude = isset($data['latitude']) ? $data['latitude'] : 'No Latitude';
     $longitude = isset($data['longitude']) ? $data['longitude'] : 'No Longitude';
 
-    // Log the received coordinates for debugging
+    // Log coordinates
     error_log("Received Latitude: $latitude, Longitude: $longitude");
 
-    // Create a new PHPMailer instance
-    $mail = new PHPMailer(true);
+    $emailBody = "
+        <h2>User Reached Destination</h2>
+
+        <p>A user has successfully reached their destination.</p>
+
+        <h3>Location Details</h3>
+
+        <ul>
+            <li><strong>Latitude:</strong> {$latitude}</li>
+            <li><strong>Longitude:</strong> {$longitude}</li>
+            <li>
+                <a href='https://www.google.com/maps?q={$latitude},{$longitude}' target='_blank'>
+                    View on Google Maps
+                </a>
+            </li>
+        </ul>
+
+        <p>Regards,<br><strong>FlexiRide Team</strong></p>
+    ";
 
     try {
-        // Email setup
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';  // Your SMTP server
-        $mail->SMTPAuth = true;
-        $mail->Username = 'aravind18090@gmail.com';  // Your email
-        $mail->Password = 'Aravind@1809';  // Your email app password (use App-specific password for Gmail)
-        $mail->SMTPSecure = 'tls';  // TLS encryption
-        $mail->Port = 587;  // SMTP port
 
-        // Email content
-        $mail->setFrom('no-reply@yourwebsite.com', 'Your Website');
-        $mail->addAddress('rangareddyvenkata734@gmail.com');  // Recipient email
+        sendResendEmail(
+            "rangareddyvenkata734@gmail.com",
+            "Admin",
+            "User Reached Destination",
+            $emailBody
+        );
 
-        $mail->isHTML(true);  // Set email format to HTML
-        $mail->Subject = 'User Reached Destination';
-        $mail->Body = 'A user has reached their destination. Location: Latitude: ' . $latitude . ', Longitude: ' . $longitude;
+        echo json_encode([
+            "status" => "success",
+            "message" => "Location and email sent successfully."
+        ]);
 
-        // Send the email
-        if ($mail->send()) {
-            echo json_encode(["status" => "success", "message" => "Location and email sent successfully."]);
-        } else {
-            echo json_encode(["status" => "error", "message" => "Failed to send email."]);
-        }
     } catch (Exception $e) {
-        echo json_encode(["status" => "error", "message" => "Email error: {$mail->ErrorInfo}"]);
+
+        error_log("Resend Error: " . $e->getMessage());
+
+        echo json_encode([
+            "status" => "error",
+            "message" => "Failed to send email."
+        ]);
     }
 
     exit;
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">

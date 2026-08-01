@@ -1,37 +1,50 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require 'resend.php';
 include 'db.php';
-require 'vendor/autoload.php'; // Include PHPMailer via Composer autoload
 
 session_start();
 
-// Function to send OTP using PHPMailer
-function sendOtp($email, $otp) {
-    $mail = new PHPMailer(true);
+/**
+ * Send OTP using Resend
+ */
+function sendOtp($email, $otp)
+{
+    $emailBody = "
+    <h2>FlexiRide OTP Verification</h2>
+
+    <p>Hello,</p>
+
+    <p>Your One-Time Password (OTP) for verification is:</p>
+
+    <h1 style='font-size:32px;color:#2563eb;letter-spacing:5px;'>{$otp}</h1>
+
+    <p>This OTP is valid for a limited time.</p>
+
+    <p><strong>Do not share this OTP with anyone.</strong></p>
+
+    <br>
+
+    <p>Regards,<br>
+    <strong>FlexiRide Team</strong></p>
+    ";
 
     try {
-        // SMTP server configuration
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com'; // Gmail SMTP server
-        $mail->SMTPAuth = true;
-        $mail->Username = 'flexiride247@gmail.com'; // Your email
-        $mail->Password = 'lhyzlfabuyopgkqo'; // Your app password
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
 
-        $mail->setFrom('flexiride247@gmail.com', 'FlexiRide');
-        $mail->addAddress($email);
+        sendResendEmail(
+            $email,
+            "FlexiRide User",
+            "Your OTP for Verification",
+            $emailBody
+        );
 
-        $mail->isHTML(true);
-        $mail->Subject = 'Your OTP for Verification';
-        $mail->Body = "Hello,<br>Your OTP for verification is: <b>$otp</b><br>Please do not share this OTP.";
-
-        $mail->send();
         return true;
+
     } catch (Exception $e) {
-        error_log("PHPMailer Error: " . $mail->ErrorInfo);
+
+        error_log("Resend Error: " . $e->getMessage());
+
         return false;
+
     }
 }
 
@@ -39,62 +52,79 @@ $home = false;
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     if (isset($_POST['send_otp'])) {
+
         // Generate a 4-digit OTP
         $otp = rand(1000, 9999);
 
-        // Save OTP in session
         $_SESSION['otp'] = $otp;
         $_SESSION['otp_timestamp'] = time();
 
-        // Use the default email for testing
         if (isset($_POST['email'])) {
-            $email = $_POST['email'];
-            $_SESSION['email'] = $_POST['email'];
+
+            $email = trim($_POST['email']);
+            $_SESSION['email'] = $email;
+
             $sql = "SELECT * FROM users WHERE email = '$email'";
             $result = $conn->query($sql);
 
             if ($result->num_rows > 0) {
+
                 if (sendOtp($email, $otp)) {
+
                     $successMessage = "OTP sent successfully.";
+
                 } else {
+
                     $errorMessage = "Failed to send OTP. Please try again.";
+
                 }
+
             } else {
+
                 $errorMessage = "Entered Email is not registered.";
+
             }
         }
 
-        // Send OTP
-
     } elseif (isset($_POST['verify_otp'])) {
-        // Combine individual input fields into a single OTP value
+
         $enteredOtp = $_POST['otp'] ?? '';
 
-        // Check if OTP matches and has not expired
         if (isset($_SESSION['otp']) && $enteredOtp == $_SESSION['otp']) {
-            if (time() - $_SESSION['otp_timestamp'] > 3000) { // 5 minutes expiration
+
+            if (time() - $_SESSION['otp_timestamp'] > 3000) {
+
                 $errorMessage = "OTP expired. Please request a new one.";
+
                 $home = false;
+
                 unset($_SESSION['otp'], $_SESSION['otp_timestamp']);
+
             } else {
+
                 $successMessage = "OTP verified successfully!";
-                $email=$_SESSION['email'];
+
+                $email = $_SESSION['email'];
+
                 unset($_SESSION['otp'], $_SESSION['otp_timestamp']);
-                header("Location: forgot_otp.php?messege=$successMessage&email=$email");
-                $home = true;
-                
+
+                header("Location: forgot_otp.php?messege=" . urlencode($successMessage) . "&email=" . urlencode($email));
+                exit();
 
             }
+
         } else {
+
             $errorMessage = "Invalid OTP. Please try again.";
+
             $home = false;
+
         }
     }
 }
 ?>
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
