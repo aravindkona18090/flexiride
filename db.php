@@ -1,12 +1,16 @@
 <?php
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "flexiride";
+// Railway environment variables (if available), otherwise use local XAMPP values
+$servername = getenv("MYSQLHOST") ?: "localhost";
+$username   = getenv("MYSQLUSER") ?: "root";
+$password   = getenv("MYSQLPASSWORD") ?: "";
+$dbname     = getenv("MYSQLDATABASE") ?: "flexiride";
+$port       = getenv("MYSQLPORT") ?: 3306;
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+// Create connection
+$conn = mysqli_connect($servername, $username, $password, $dbname, $port);
 
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+// Check connection
+if (!$conn) {
+    die("Connection failed: " . mysqli_connect_error());
 }
 ?>
