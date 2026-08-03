@@ -1,30 +1,34 @@
 <?php
 /**
- * FlexiRide Brevo API Mailer Helper
- * Uses Brevo HTTP API (https://api.brevo.com/v3/smtp/email)
+ * FlexiRide Brevo & Resend API Mailer Helper
+ * Uses Brevo HTTP API (https://api.brevo.com/v3/smtp/email) or Resend API
  * - Works 100% on Railway (HTTP/HTTPS port 443 is never blocked)
  * - 300 free emails/day to ANY real user
- * - No domain required (uses your email as sender)
+ * - No domain required
  */
 
-$lastMailerError = '';
+// OPTIONAL: Paste your API Key directly below if not using environment variables
+define('CONFIG_BREVO_API_KEY', '');   // e.g. 'xkeysib-...'
+define('CONFIG_RESEND_API_KEY', '');  // e.g. 're_...'
+define('CONFIG_SENDER_EMAIL', 'flexiride247@gmail.com');
+
+$GLOBALS['lastMailerError'] = '';
 
 function sendResendMail(string $toEmail, string $toName, string $subject, string $htmlBody): bool {
-    global $lastMailerError;
-    $lastMailerError = '';
+    $GLOBALS['lastMailerError'] = '';
 
-    // Check Brevo API Key first, fallback to RESEND_API_KEY if using Resend
-    $brevoKey = getenv('BREVO_API_KEY') ?: (defined('BREVO_API_KEY') ? BREVO_API_KEY : '');
-    $resendKey = getenv('RESEND_API_KEY') ?: (defined('RESEND_API_KEY') ? RESEND_API_KEY : '');
+    // Check Brevo API Key first, then Resend Key
+    $brevoKey  = getenv('BREVO_API_KEY') ?: (defined('CONFIG_BREVO_API_KEY') ? CONFIG_BREVO_API_KEY : '');
+    $resendKey = getenv('RESEND_API_KEY') ?: (defined('CONFIG_RESEND_API_KEY') ? CONFIG_RESEND_API_KEY : '');
 
     // Sender email address
-    $senderEmail = getenv('SENDER_EMAIL') ?: (getenv('RESEND_FROM_EMAIL') ?: 'flexiride247@gmail.com');
+    $senderEmail = getenv('SENDER_EMAIL') ?: (getenv('RESEND_FROM_EMAIL') ?: (defined('CONFIG_SENDER_EMAIL') ? CONFIG_SENDER_EMAIL : 'flexiride247@gmail.com'));
     $senderName  = 'FlexiRide';
 
     // ------------------------------------------------------------
-    // 1. IF BREVO API KEY IS PROVIDED -> USE BREVO HTTP API (RECOMMENDED FOR RAILWAY)
+    // 1. IF BREVO API KEY IS PROVIDED -> USE BREVO HTTP API
     // ------------------------------------------------------------
-    if (!empty($brevoKey)) {
+    if (!empty(trim($brevoKey))) {
         $payload = json_encode([
             'sender'      => ['name' => $senderName, 'email' => $senderEmail],
             'to'          => [['email' => $toEmail, 'name' => !empty($toName) ? $toName : $toEmail]],
@@ -51,8 +55,8 @@ function sendResendMail(string $toEmail, string $toName, string $subject, string
         curl_close($ch);
 
         if ($curlError) {
-            $lastMailerError = "Brevo cURL Error: " . $curlError;
-            error_log($lastMailerError);
+            $GLOBALS['lastMailerError'] = "Brevo cURL Error: " . $curlError;
+            error_log($GLOBALS['lastMailerError']);
             return false;
         }
 
@@ -61,8 +65,8 @@ function sendResendMail(string $toEmail, string $toName, string $subject, string
             return true;
         } else {
             $errMsg = $resData['message'] ?? "HTTP {$httpCode}";
-            $lastMailerError = "Brevo API Error [{$httpCode}]: " . $errMsg;
-            error_log($lastMailerError);
+            $GLOBALS['lastMailerError'] = "Brevo API Error [{$httpCode}]: " . $errMsg;
+            error_log($GLOBALS['lastMailerError']);
             return false;
         }
     }
@@ -70,7 +74,7 @@ function sendResendMail(string $toEmail, string $toName, string $subject, string
     // ------------------------------------------------------------
     // 2. FALLBACK TO RESEND API
     // ------------------------------------------------------------
-    if (!empty($resendKey)) {
+    if (!empty(trim($resendKey))) {
         $toRecipient = !empty(trim($toName)) ? "{$toName} <{$toEmail}>" : $toEmail;
 
         $payload = json_encode([
@@ -98,8 +102,8 @@ function sendResendMail(string $toEmail, string $toName, string $subject, string
         curl_close($ch);
 
         if ($curlError) {
-            $lastMailerError = "Resend cURL Error: " . $curlError;
-            error_log($lastMailerError);
+            $GLOBALS['lastMailerError'] = "Resend cURL Error: " . $curlError;
+            error_log($GLOBALS['lastMailerError']);
             return false;
         }
 
@@ -108,14 +112,18 @@ function sendResendMail(string $toEmail, string $toName, string $subject, string
             return true;
         } else {
             $errMsg = $resData['message'] ?? ($resData['name'] ?? "HTTP Status {$httpCode}");
-            $lastMailerError = "Resend API Error [{$httpCode}]: " . $errMsg;
-            error_log($lastMailerError);
+            $GLOBALS['lastMailerError'] = "Resend API Error [{$httpCode}]: " . $errMsg;
+            error_log($GLOBALS['lastMailerError']);
             return false;
         }
     }
 
-    $lastMailerError = "No Mailer API Key set. Please set BREVO_API_KEY or RESEND_API_KEY environment variable.";
-    error_log($lastMailerError);
+    $GLOBALS['lastMailerError'] = "No API key found! Please add BREVO_API_KEY to your environment variables or mailer.php.";
+    error_log($GLOBALS['lastMailerError']);
     return false;
+}
+
+function getLastMailerError(): string {
+    return $GLOBALS['lastMailerError'] ?? 'Unknown mailer error.';
 }
 ?>
