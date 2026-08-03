@@ -44,10 +44,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <p style='color:#94a3b8; font-size:13px;'>Valid for 10 minutes. Do not share this code with anyone.</p>
                 </div>
             ";
-            sendResendMail($email, $name, 'FlexiRide - Account Verification OTP Code', $otpHtml);
+            $sent = sendResendMail($email, $name, 'FlexiRide - Account Verification OTP Code', $otpHtml);
 
-            $showOtpStep = true;
-            $success = "6-Digit Verification OTP sent to {$email}!";
+            if ($sent) {
+                $showOtpStep = true;
+                $success = "6-Digit Verification OTP sent to {$email}!";
+            } else {
+                global $lastResendError;
+                $error = "Email Delivery Failed: " . ($lastResendError ?: "Please verify your Resend API Key.");
+            }
         }
     } elseif ($action === 'verify_otp') {
         $enteredOtp = trim($_POST['otp_code']);
