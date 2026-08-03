@@ -5,27 +5,38 @@ session_start();
 $rides = [];
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $origin = $_POST['origin'];
-    $destination = $_POST['destination'];
-    $vehicle_type = $_POST['vehicle_type'];
+    $origin           = trim($_POST['origin'] ?? '');
+    $destination      = trim($_POST['destination'] ?? '');
+    $vehicle_category = trim($_POST['vehicle_category'] ?? 'bike');
+    $helmet_filter    = (int)($_POST['helmet_filter'] ?? 0);
+    $female_filter    = trim($_POST['female_filter'] ?? '');
+    $current_user_id  = $_SESSION['user_id'] ?? 0;
 
-    // Get the current user ID
-    $current_user_id = $_SESSION['user_id'];
+    $query = "SELECT r.*, u.name as driver_name, u.avg_rating, u.is_verified 
+              FROM rides r 
+              JOIN users u ON r.user_id = u.id 
+              WHERE (r.origin LIKE ? OR r.destination LIKE ? OR ? = '' OR ? = '') 
+                AND (r.vehicle_category = ? OR r.vehicle_type = ?) 
+                AND (? = 0 OR r.helmet_provided = 1)
+                AND (? = '' OR r.gender_preference = 'female_only')
+                AND r.user_id != ? 
+                AND r.seats_available > 0 
+              ORDER BY r.ride_date ASC, r.ride_time ASC";
 
-    // Modify the query to exclude rides posted by the current user
-    $sql = "SELECT * FROM rides WHERE origin = '$origin' AND destination = '$destination' AND vehicle_type = '$vehicle_type' AND user_id != '$current_user_id'";
-    $result = $conn->query($sql);
+    $stmt = $conn->prepare($query);
+    $origLike = "%$origin%";
+    $destLike = "%$destination%";
+    $stmt->bind_param("ssssssisi", $origLike, $destLike, $origin, $destination, $vehicle_category, $vehicle_category, $helmet_filter, $female_filter, $current_user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    if ($result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $rides[] = $row;
-        }
+    while ($row = $result->fetch_assoc()) {
+        $rides[] = $row;
     }
-    
-    // Return the rides as a JSON response
+
     header('Content-Type: application/json');
     echo json_encode(['rides' => $rides]);
-    exit; // Stop further execution
+    exit();
 }
 ?>
 
@@ -34,339 +45,276 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Find a Ride</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
-    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <title>Find Rides & Route Matching - FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
-        /* Body Styling */
-        body {
-            font-family: 'Poppins', sans-serif;
-            margin: 0;
-            padding: 0;
-            background:  linear-gradient(135deg, #74ebd5, #ACB6E5);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: scroll; 
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
 
-        /* Navbar Styles */
-        .navbar {
-            background-color: #000;
-            color: #fff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        .logo img {
-            height: 50px;
-            width: fit-content; /* Adjust as needed */
-        }
-
-        .nav-links {
-            list-style: none;
-            display: flex;
-        }
-
-        .nav-links li {
-            margin-left: 30px;
-        }
-
-        .nav-links a {
-            text-decoration: none;
-            color: #fff;
-            font-size: 18px;
-            transition: color 0.3s ease, background-color 0.3s ease;
-            padding: 8px 16px;
-            border-radius: 4px;
-        }
-
-        .nav-links a:hover {
-            color: #ff9800;
-            background-color: rgba(255, 152, 0, 0.2);
-            border-radius: 50%;
-        }
-
-        /* Responsive Design for smaller screens */
-        @media screen and (max-width: 768px) {
-            .navbar {
-                flex-direction: column;
-            }
-            .nav-links {
-                flex-direction: column;
-                align-items: center;
-                margin-top: 10px;
-            }
-            .nav-links li {
-                margin-left: 0;
-                margin-bottom: 0;
-            }
-        }
-
-        /* Animation for floating bubbles */
-        @keyframes bubble {
-            0% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-600px); opacity: 0; }
-        }
-
-        .bubble {
-            position: absolute;
-            bottom: -150px;
-            background: linear-gradient(45deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
-            border-radius: 50%;
-            animation: bubble 10s infinite ease-in-out;
-            z-index: -10;
-            box-shadow: 0px 4px 15px rgba(255, 255, 255, 0.7);
-        }
-
-        /* Increased number of bubbles */
-        .bubble:nth-child(1) { width: 60px; height: 60px; left: 10%; animation-duration: 7s; }
-        .bubble:nth-child(2) { width: 100px; height: 100px; left: 30%; animation-duration: 12s; }
-        .bubble:nth-child(3) { width: 40px; height: 40px; left: 50%; animation-duration: 8s; }
-        .bubble:nth-child(4) { width: 70px; height: 70px; left: 70%; animation-duration: 15s; }
-        .bubble:nth-child(5) { width: 30px; height: 30px; left: 90%; animation-duration: 9s; }
-        .bubble:nth-child(6) { width: 80px; height: 80px; left: 20%; animation-duration: 11s; }
-        .bubble:nth-child(7) { width: 50px; height: 50px; left: 40%; animation-duration: 14s; }
-        .bubble:nth-child(8) { width: 90px; height: 90px; left: 60%; animation-duration: 13s; }
-        .bubble:nth-child(9) { width: 30px; height: 30px; left: 80%; animation-duration: 16s; }
-        .bubble:nth-child(10) { width: 75px; height: 75px; left: 25%; animation-duration: 10s; }
-        .bubble:nth-child(11) { width: 60px; height: 60px; left: 5%; animation-duration: 7s; }
-        .bubble:nth-child(12) { width: 100px; height: 100px; left: 15%; animation-duration: 12s; }
-        .bubble:nth-child(13) { width: 40px; height: 40px; left: 35%; animation-duration: 8s; }
-        .bubble:nth-child(14) { width: 70px; height: 70px; left: 45%; animation-duration: 15s; }
-        .bubble:nth-child(15) { width: 30px; height: 30px; left: 55%; animation-duration: 9s; }
-        .bubble:nth-child(16) { width: 80px; height: 80px; left: 65%; animation-duration: 11s; }
-        .bubble:nth-child(17) { width: 50px; height: 50px; left: 75%; animation-duration: 14s; }
-        .bubble:nth-child(18) { width: 90px; height: 90px; left: 2%; animation-duration: 13s; }
-        .bubble:nth-child(19) { width: 30px; height: 30px; left: 88%; animation-duration: 16s; }
-        .bubble:nth-child(20) { width: 75px; height: 75px; left: 6%; animation-duration: 10s; }
-
-        /* Container for the form */
-        .container {
-            z-index: 2;
-            background: linear-gradient(135deg, #F0FFF0, #E0FFFF);
-            backdrop-filter: blur(10px);
+        .container { max-width: 950px; margin: 30px auto; padding: 0 20px; width: 100%; }
+        .search-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
             border-radius: 20px;
             padding: 30px;
-            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            width: 400px;
-            transition: transform 0.3s ease;
-            margin: auto auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
         }
+        .vehicle-tabs { display: flex; gap: 15px; margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 14px; border-radius: 12px; border: 2px solid var(--input-border);
+            background: var(--input-bg); color: var(--text-muted); font-size: 16px; font-weight: 600;
+            cursor: pointer; text-align: center; transition: all 0.3s;
+        }
+        .tab-btn.active { border-color: var(--primary-color); color: var(--primary-color); }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr 120px; gap: 15px; margin-bottom: 15px; }
+        .form-group { position: relative; }
+        .form-grid input { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); font-size: 15px; outline: none; }
+        .btn-search { background: var(--primary-gradient); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+        
+        .filter-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .pill-btn {
+            padding: 6px 14px; border-radius: 20px; border: 1px solid var(--input-border);
+            background: var(--input-bg); color: var(--text-muted); font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .pill-btn.active { background: var(--success-bg); color: var(--success-color); border-color: var(--success-color); }
 
-        /* Container Hover Effect */
-        .container:hover {
-            transform: scale(1.05);
+        .suggestions-list {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: var(--input-bg); border: 1px solid var(--primary-color); border-radius: 10px;
+            max-height: 200px; overflow-y: auto; z-index: 2000; display: none;
         }
+        .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid var(--input-border); font-size: 14px; color: var(--text-muted); }
+        .suggestion-item:hover { background: var(--primary-color); color: white; }
 
-        /* Form styling */
-        .container h2 {
-            font-size: 2rem;
-            color: #333;
-            margin-bottom: 20px;
-        }
+        #map { height: 280px; border-radius: 14px; border: 1px solid var(--card-border); margin-bottom: 20px; }
 
-        .container input, .container select, .container button {
-            width: 90%;
-            padding: 12px;
-            margin: 10px 0;
-            border: none;
-            border-radius: 5px;
-            font-size: 1rem;
+        .ride-list { display: flex; flex-direction: column; gap: 15px; }
+        .ride-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.3s ease;
         }
-
-        .container input:focus, .container select:focus {
-            outline: none;
-            box-shadow: 0 0 8px #007BFF;
-        }
-
-        .container button {
-            background: linear-gradient(135deg, #FFCCCB, #DDA0DD);
-            color: #fff;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .container button:hover {
-            background-color: #0056b3;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            max-width: 600px;
-            width: 90%;
-            text-align: center;
-        }
-
-        .modal-content h3 {
-            color: #007BFF;
-        }
-
-        .modal-content ul {
-            list-style-type: none;
-            padding: 0;
-        }
-
-        .modal-content li {
-            background-color: #f1f1f1;
-            margin: 10px 0;
-            padding: 15px;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
-
-        .modal-content li:hover {
-            background-color: #e0e0e0;
-        }
-
-        .modal-content .book-now {
-            background-color: #28a745;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-
-        .modal-content .close {
-            background-color: #dc3545;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
+        .ride-card:hover { border-color: var(--primary-color); transform: translateY(-2px); }
+        .driver-info { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .driver-avatar { width: 44px; height: 44px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; }
+        .badge-tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-right: 6px; }
+        .badge-helmet { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); }
+        .badge-category { background: rgba(56, 189, 248, 0.2); color: var(--primary-color); border: 1px solid var(--primary-color); }
+        .price-tag { font-size: 24px; font-weight: 700; color: var(--success-color); text-align: right; }
+        .btn-book { display: inline-block; background: var(--primary-gradient); color: white; padding: 10px 20px; border-radius: 10px; text-decoration: none; font-weight: 600; margin-top: 8px; transition: 0.3s; }
     </style>
-    <link rel="icon" href="images\favvi.png" type="image/x-icon">
 </head>
 <body>
-    <div class="navbar">
-        <div class="logo">
-            <img src="images/logo1.png" alt="logo" height="30%" width="30%;">
+
+<?php include 'navbar.php'; ?>
+
+<div class="container">
+    <div class="search-card">
+        <div class="vehicle-tabs">
+            <div class="tab-btn active" id="tab-bike" onclick="setCategory('bike')">🏍️ Two-Wheeler / Bike Rides</div>
+            <div class="tab-btn" id="tab-car" onclick="setCategory('car')">🚗 Car Sharing Rides</div>
         </div>
-        <img src="images/name.png" alt="logo" height="20%" width="20%">
-        <ul class="nav-links">
-            <li><a href="index.php">Home</a></li>
-            <li><a href="rides.php">Find</a></li>
-            <?php if (isset($_SESSION['user_id'])): ?>
-                <li><a href="post_ride.php">Post</a></li>
-                <li><a href="myrides.php">MyRides</a></li>
-                <li><a href="#" id="logout-link">Logout</a></li>
-                <li><a href="profile.php"><i class='bx bxs-user bx-sm' ></i></a></li>
-            <?php else: ?>
-                <li><a href="login.php">Login</a></li>
-            <?php endif; ?>
-        </ul>
-    </div>
 
-    <!-- Bubbles for animation -->
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
+        <form id="searchForm">
+            <input type="hidden" id="vehicle_category" value="bike">
+            <input type="hidden" id="helmet_filter" value="0">
+            <input type="hidden" id="female_filter" value="">
 
-    <div class="container">
-        <h2>Find a Ride</h2>
-        <form id="findRideForm">
-            <input type="text" id="origin" placeholder="Origin" required>
-            <input type="text" id="destination" placeholder="Destination" required>
-            <select id="vehicle_type" required>
-                <option value="">Select Vehicle Type</option>
-                <option value="car">Car</option>
-                <option value="bike">Bike</option>
-            </select>
-            <button type="submit">Find Ride</button>
+            <div class="form-grid">
+                <div class="form-group">
+                    <input type="text" id="origin" placeholder="📍 Type pickup address or click map" autocomplete="off">
+                    <div class="suggestions-list" id="originSuggestions"></div>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="destination" placeholder="🏁 Type drop address or click map" autocomplete="off">
+                    <div class="suggestions-list" id="destSuggestions"></div>
+                </div>
+                <button type="submit" class="btn-search">Search</button>
+            </div>
+
+            <!-- Instant Filter Pills -->
+            <div class="filter-pills">
+                <div class="pill-btn" id="pill-helmet" onclick="togglePill('helmet')">🪖 Spare Helmet Provided</div>
+                <div class="pill-btn" id="pill-female" onclick="togglePill('female')">👩 Female-Only Rides</div>
+            </div>
         </form>
+
+        <div id="map"></div>
     </div>
 
-    <!-- Modal -->
-    <div class="modal" id="rideModal">
-        <div class="modal-content">
-            <h3>Available Rides</h3>
-            <ul id="rideList"></ul>
-            <button class="close" onclick="closeModal()">Close</button>
-        </div>
+    <div id="results" class="ride-list">
+        <p style="text-align:center; color:var(--text-muted);">Enter locations above or click map pins to search matching routes.</p>
     </div>
+</div>
 
-    <script>
-        $(document).ready(function() {
-            $('#findRideForm').on('submit', function(event) {
-                event.preventDefault();
-
-                let origin = $('#origin').val();
-                let destination = $('#destination').val();
-                let vehicle_type = $('#vehicle_type').val();
-
-                $.ajax({
-                    type: 'POST',
-                    url: 'find_ride.php',
-                    data: { origin: origin, destination: destination, vehicle_type: vehicle_type },
-                    dataType: 'json',
-                    success: function(data) {
-                        if (data.rides.length > 0) {
-                            let rideList = $('#rideList');
-                            rideList.empty();
-                            data.rides.forEach(function(ride) {
-                                rideList.append('<li>' + ride.origin + ' to ' + ride.destination + ' - ' + ride.vehicle_type + '</li>');
-                            });
-                            $('#rideModal').fadeIn();
-                        } else {
-                            alert('No rides found.');
-                        }
-                    },
-                    error: function() {
-                        alert('An error occurred while finding rides.');
-                    }
-                });
-            });
-        });
-
-        function closeModal() {
-            $('#rideModal').fadeOut();
+<script>
+    function setCategory(cat) {
+        document.getElementById('vehicle_category').value = cat;
+        if (cat === 'bike') {
+            document.getElementById('tab-bike').classList.add('active');
+            document.getElementById('tab-car').classList.remove('active');
+        } else {
+            document.getElementById('tab-car').classList.add('active');
+            document.getElementById('tab-bike').classList.remove('active');
         }
-    </script>
+        $('#searchForm').submit();
+    }
+
+    function togglePill(type) {
+        if (type === 'helmet') {
+            const h = document.getElementById('helmet_filter');
+            const pill = document.getElementById('pill-helmet');
+            if (h.value === '1') { h.value = '0'; pill.classList.remove('active'); }
+            else { h.value = '1'; pill.classList.add('active'); }
+        } else if (type === 'female') {
+            const f = document.getElementById('female_filter');
+            const pill = document.getElementById('pill-female');
+            if (f.value === 'female_only') { f.value = ''; pill.classList.remove('active'); }
+            else { f.value = 'female_only'; pill.classList.add('active'); }
+        }
+        $('#searchForm').submit();
+    }
+
+    const map = L.map('map').setView([13.6288, 79.4192], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let originMarker = null;
+    let destMarker = null;
+
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+
+        if (!originMarker) {
+            setOriginPin(lat, lng, `GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                .then(r => r.json())
+                .then(data => { if(data.display_name) document.getElementById('origin').value = data.display_name; });
+        } else if (!destMarker) {
+            setDestPin(lat, lng, `GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                .then(r => r.json())
+                .then(data => { if(data.display_name) document.getElementById('destination').value = data.display_name; });
+            $('#searchForm').submit();
+        }
+    });
+
+    function setOriginPin(lat, lng, name) {
+        if (originMarker) map.removeLayer(originMarker);
+        originMarker = L.marker([lat, lng]).addTo(map).bindPopup(`📍 Pickup: ${name}`).openPopup();
+    }
+
+    function setDestPin(lat, lng, name) {
+        if (destMarker) map.removeLayer(destMarker);
+        destMarker = L.marker([lat, lng]).addTo(map).bindPopup(`🏁 Drop: ${name}`).openPopup();
+    }
+
+    function setupAutocomplete(inputId, suggestionsId, setPinFunc) {
+        const input = document.getElementById(inputId);
+        const suggList = document.getElementById(suggestionsId);
+        let timeout = null;
+
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const q = input.value.trim();
+            if (q.length < 3) { suggList.style.display = 'none'; return; }
+            timeout = setTimeout(() => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${encodeURIComponent(q)}`)
+                    .then(r => r.json())
+                    .then(results => {
+                        suggList.innerHTML = '';
+                        if (results.length > 0) {
+                            suggList.style.display = 'block';
+                            results.slice(0, 5).forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.textContent = item.display_name;
+                                div.onclick = function() {
+                                    input.value = item.display_name;
+                                    suggList.style.display = 'none';
+                                    const lat = parseFloat(item.lat);
+                                    const lon = parseFloat(item.lon);
+                                    map.setView([lat, lon], 13);
+                                    setPinFunc(lat, lon, item.display_name);
+                                    $('#searchForm').submit();
+                                };
+                                suggList.appendChild(div);
+                            });
+                        } else { suggList.style.display = 'none'; }
+                    });
+            }, 300);
+        });
+    }
+
+    setupAutocomplete('origin', 'originSuggestions', setOriginPin);
+    setupAutocomplete('destination', 'destSuggestions', setDestPin);
+
+    $(document).ready(function() {
+        $('#searchForm').on('submit', function(e) {
+            e.preventDefault();
+            const origin = $('#origin').val();
+            const destination = $('#destination').val();
+            const vehicle_category = $('#vehicle_category').val();
+            const helmet_filter = $('#helmet_filter').val();
+            const female_filter = $('#female_filter').val();
+
+            $.post('find_ride.php', { origin, destination, vehicle_category, helmet_filter, female_filter }, function(res) {
+                const resultsDiv = $('#results');
+                resultsDiv.empty();
+
+                if (res.rides && res.rides.length > 0) {
+                    res.rides.forEach(ride => {
+                        const helmetBadge = ride.helmet_provided == 1 ? '<span class="badge-tag badge-helmet">🪖 Spare Helmet Provided</span>' : '';
+                        const card = `
+                            <div class="ride-card">
+                                <div>
+                                    <div class="driver-info">
+                                        <div class="driver-avatar"><i class='bx bxs-user'></i></div>
+                                        <div>
+                                            <strong>${ride.driver_name}</strong>
+                                            <div style="font-size:13px; color:var(--text-muted);">⭐ ${ride.avg_rating || '5.0'} Rating</div>
+                                        </div>
+                                    </div>
+                                    <h3 style="font-size:18px; margin-bottom:6px;">${ride.origin} ➔ ${ride.destination}</h3>
+                                    <p style="font-size:14px; color:var(--text-color); margin-bottom:8px;">
+                                        📅 ${ride.ride_date} at ${ride.ride_time} | Vehicle: <strong>${ride.vehicle_model || ride.vehicle_type}</strong>
+                                    </p>
+                                    <div>
+                                        <span class="badge-tag badge-category">${(ride.vehicle_category || ride.vehicle_type).toUpperCase()}</span>
+                                        ${helmetBadge}
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div class="price-tag">₹${ride.price}</div>
+                                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">${ride.seats_available} seat left</div>
+                                    <a href="book_ride.php?ride_id=${ride.id}" class="btn-book">Book Seat</a>
+                                </div>
+                            </div>
+                        `;
+                        resultsDiv.append(card);
+                    });
+                } else {
+                    resultsDiv.html('<div style="text-align:center; padding:30px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:16px;">No matching rides found along this route. Be the first to post a ride!</div>');
+                }
+            }, 'json');
+        });
+        
+        $('#searchForm').submit();
+    });
+</script>
 </body>
 </html>

@@ -1,5 +1,4 @@
 <?php
-require 'resend.php';
 include 'db.php';
 session_start();
 
@@ -10,158 +9,25 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// Handle ride deletion
-if (isset($_GET['delete_id'])) {
-    $booking_id = intval($_GET['delete_id']); // Ensure integer type for safety
+// Fetch User Data for Emergency SOS WhatsApp
+$uStmt = $conn->prepare("SELECT u.*, uc.emergency_phone, uc.emergency_email1 FROM users u LEFT JOIN user_emergency_contacts uc ON u.id = uc.user_id WHERE u.id = ?");
+$uStmt->bind_param("i", $user_id);
+$uStmt->execute();
+$userData = $uStmt->get_result()->fetch_assoc() ?: [];
 
-    // Fetch booking details and ride details to restore seats and notify
-    $stmt = $conn->prepare("
-        SELECT b.*, r.origin, r.destination, r.ride_date, r.ride_time, r.user_id AS poster_id, r.seats_available, r.vehicle_type, u.email AS posted_email
+// Fetch unread notifications for Passenger
+$notifStmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+$notifStmt->bind_param("i", $user_id);
+$notifStmt->execute();
+$notifications = $notifStmt->get_result();
+
+$sql = "SELECT b.id as booking_id, b.trip_status, r.*, u.name as driver_name, u.phone as driver_phone, u.upi_id as driver_upi
         FROM bookings b
         JOIN rides r ON b.ride_id = r.id
         JOIN users u ON r.user_id = u.id
-        WHERE b.id = ? AND b.user_id = ?
-    ");
-    $stmt->bind_param("ii", $booking_id, $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+        WHERE b.user_id = ?
+        ORDER BY r.ride_date DESC, r.ride_time DESC";
 
-    if ($result->num_rows > 0) {
-        $ride = $result->fetch_assoc();
-        $ride_id = $ride['ride_id'];
-        $seats_booked = $ride['seats_booked'];
-        $email = $ride['posted_email'];
-
-        // Restore seats in the rides table
-        $update_stmt = $conn->prepare("UPDATE rides SET seats_available = seats_available + ? WHERE id = ?");
-        $update_stmt->bind_param("ii", $seats_booked, $ride_id);
-        $update_stmt->execute();
-        $update_stmt->close();
-
-        // Delete the booking
-        $delete_stmt = $conn->prepare("DELETE FROM bookings WHERE id = ? AND user_id = ?");
-        $delete_stmt->bind_param("ii", $booking_id, $user_id);
-        if ($delete_stmt->execute()) {
-            $delete_stmt->close();
-
-            // Fetch user details for email notifications
-            $user_stmt = $conn->prepare("SELECT name, email, phone FROM users WHERE id = ?");
-            $user_stmt->bind_param("i", $user_id);
-            $user_stmt->execute();
-            $detail = $user_stmt->get_result()->fetch_assoc();
-            $user_stmt->close();
-
-            // Send notification to the ride poster
-            $emailBody = "
-<h2>Ride Cancellation Notification</h2>
-
-<p>A passenger has cancelled their booking.</p>
-
-<h3>Passenger Details</h3>
-
-<ul>
-    <li><strong>Name:</strong> {$detail['name']}</li>
-    <li><strong>Email:</strong> {$detail['email']}</li>
-    <li><strong>Phone:</strong> {$detail['phone']}</li>
-</ul>
-
-<h3>Ride Details</h3>
-
-<ul>
-    <li><strong>Origin:</strong> {$ride['origin']}</li>
-    <li><strong>Destination:</strong> {$ride['destination']}</li>
-    <li><strong>Ride Date:</strong> {$ride['ride_date']}</li>
-    <li><strong>Ride Time:</strong> {$ride['ride_time']}</li>
-    <li><strong>Seats Cancelled:</strong> {$seats_booked}</li>
-</ul>
-
-<p>The cancelled seats have been added back to your ride.</p>
-
-<p>Regards,<br><strong>FlexiRide Team</strong></p>
-";
-
-try {
-
-    sendResendEmail(
-        $email,
-        "Ride Owner",
-        "Ride Cancellation Notification",
-        $emailBody
-    );
-
-} catch (Exception $e) {
-
-    error_log("Resend Error: " . $e->getMessage());
-
-}
-
-            // Send notification to the user who canceled the ride
-            $emailBody = "
-<h2>Ride Booking Cancelled</h2>
-
-<p>Dear {$detail['name']},</p>
-
-<p>Your ride booking has been cancelled successfully.</p>
-
-<h3>Ride Details</h3>
-
-<ul>
-    <li><strong>Origin:</strong> {$ride['origin']}</li>
-    <li><strong>Destination:</strong> {$ride['destination']}</li>
-    <li><strong>Ride Date:</strong> {$ride['ride_date']}</li>
-    <li><strong>Ride Time:</strong> {$ride['ride_time']}</li>
-    <li><strong>Seats Cancelled:</strong> {$seats_booked}</li>
-</ul>
-
-<p>If you did not perform this cancellation, please contact FlexiRide support immediately.</p>
-
-<p>Thank you for using <strong>FlexiRide</strong>.</p>
-
-<p>Regards,<br><strong>FlexiRide Team</strong></p>
-";
-
-try {
-
-    sendResendEmail(
-        $detail['email'],
-        $detail['name'],
-        "Ride Booking Cancellation Confirmation",
-        $emailBody
-    );
-
-    echo "<script>
-            alert('Ride booking deleted successfully! Email notifications sent.');
-            window.location.href='my_booked_rides.php';
-          </script>";
-
-} catch (Exception $e) {
-
-    error_log("Resend Error: " . $e->getMessage());
-
-    echo "<script>
-            alert('Ride booking deleted successfully.');
-            window.location.href='my_booked_rides.php';
-          </script>";
-
-          exit()
-}
-        } else {
-            echo "Error deleting booking: " . $conn->error;
-        }
-    } else {
-        echo "No booking found.";
-    }
-    $stmt->close();
-}
-
-// Fetch the rides booked by the user
-$sql = "
-    SELECT b.id AS booking_id, r.origin, r.destination, r.ride_date, r.vehicle_type, r.price, b.seats_booked, u.name AS driver_name, u.phone AS driver_phone 
-    FROM bookings b 
-    JOIN rides r ON b.ride_id = r.id 
-    JOIN users u ON r.user_id = u.id 
-    WHERE b.user_id = ?
-";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -173,312 +39,221 @@ $result = $stmt->get_result();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Booked Rides</title>
+    <title>My Booked Rides & SOS - FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
-        body {
-            background-image: url("images/op.jpg");
-            background-repeat: no-repeat;
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            margin: 0px;
-            padding: 0px;
-            font-family: "Josefin Sans", sans-serif;
-            color: #000;
-            font-size: large;
-            height: 100vh;
-            align-items: center;
-            overflow: scroll; 
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
 
-        /* Navigation Bar */
-        .navbar {
-            font-family: "Josefin Sans", sans-serif;
-            background-color: #000;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0px 0px;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
+        .container { max-width: 950px; margin: 40px auto; padding: 0 20px; width: 100%; }
 
-        .logo a {
-            font-size: 24px;
-            font-weight: bold;
-            color: #fff;
-            text-decoration: none;
-            letter-spacing: 2px;
-            transition: color 0.3s ease;
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .page-header h2 { font-size: 28px; color: var(--text-color); }
+        .btn-find { background: var(--primary-gradient); color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600; }
+
+        /* Live Alerts Page Banner Widget */
+        .alerts-widget-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--primary-color);
+            border-radius: 20px;
+            padding: 20px 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .widget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .widget-header h3 { font-size: 16px; color: var(--primary-color); display: flex; align-items: center; gap: 8px; }
+        .notif-item { font-size: 14px; color: var(--text-muted); padding: 8px 0; border-bottom: 1px solid var(--card-border); }
+        .notif-item:last-child { border-bottom: none; }
+
+        .ride-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex; justify-content: space-between; align-items: center;
         }
 
-        .logo a:hover {
-            color: #ff9800;
-        }
+        .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .status-confirmed { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); }
 
-        .nav-links {
-            list-style: none;
-            display: flex;
-        }
-
-        .nav-links li {
-            margin-left: 30px;
-        }
-
-        .nav-links a {
-            text-decoration: none;
-            color: #fff;
-            font-size: 18px;
-            transition: color 0.3s ease, background-color 0.3s ease;
-            padding: 8px 16px;
-            border-radius: 4px;
-        }
-
-        .nav-links a:hover {
-    color: white; /* Text color on hover */
-    background: linear-gradient(135deg, #4a4a8a, #6767b3); /* Gradient matching the button's color */
-    border-radius: 30%;
-}
-
-        /* Active/Current Page Link */
-        .nav-links a.active {
-            color: #ff9800;
-            background-color:linear-gradient(135deg, #4a4a8a, #6767b3); 
-        }
-
-        /* Responsive Design for smaller screens */
-        @media screen and (max-width: 768px) {
-            .navbar {
-                flex-direction: column;
-            }
-
-            .nav-links {
-                flex-direction: column;
-                align-items: center;
-                margin-top: 10px;
-            }
-
-            .nav-links li {
-                margin-left: 0;
-                margin-bottom: 0;
-            }
-        }
-        button {
-            font-family: "Josefin Sans", sans-serif;
+        .vehicle-id-box {
+            background: var(--input-bg);
+            border: 1px solid var(--primary-color);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin: 10px 0;
             display: inline-block;
-            padding: 10px 10px;
-            margin: 20px auto;
-            color: white;
-            background-color: #000000; /* Vibrant button color */
-            border: none;
-            text-align: center;
-            text-decoration: none;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Button shadow */
-            transition: background-color 0.3s ease;
-        }
-        .table {
-            font-family: "Josefin Sans", sans-serif;
-            margin: 0 auto;
-            padding: 20px;
-            width: 80%;
         }
 
-        .table table {
-            width: 100%;
-            border-collapse: collapse;
-            backdrop-filter: blur(10px);
-        }
+        .btn-sos-wa { background: #ef4444; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
+        .btn-wa-share { background: #25D366; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13px; }
+        .btn-pay-qr { background: #22c55e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13px; }
+        .btn-chat { background: var(--primary-color); color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; }
+        .btn-receipt { background: #818cf8; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; }
+        .btn-nav-map { background: #06b6d4; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; }
 
-        .table th, .table td {
-            padding: 10px;
-            text-align: center;
-            border: 1px solid #ffffffdd;
-            background-color: rgba(255, 255, 255, 0.6);
-            color: black;
-        }
+        /* Modal styling */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); padding: 30px; border-radius: 20px; text-align: center; max-width: 400px; width: 90%; }
 
-        .table th {
-            background-color: rgba(255, 255, 255, 0.8);
-        }
-
-        .table tr:nth-child(even) td {
-            background-color: rgba(255, 255, 255, 0.6);
-        }
-
-        .table tr:hover td {
-            background-color: rgba(255, 255, 255, 0.8);
-            color: black;
-        }
-
-        .table p {
-            text-align: center;
-            font-size: 1.2em;
-            color: black;
-        }
-
-        .table a{
-            display: inline-block;
-            padding: 10px 10px;
-            margin: 20px auto;
-            color: white;
-            background-color: #000000;
-            border: none;
-            text-align: center;
-            text-decoration: none;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            transition: background-color 0.3s ease;
-        }
-        .table button {
-            font-family: "Josefin Sans", sans-serif;
-            display: inline-block;
-            padding: 10px 10px;
-            margin: 20px auto;
-            color: black;
-            background-color: #000000;
-            border: none;
-            text-align: center;
-            text-decoration: none;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            transition: background-color 0.3s ease;
-        }
-
-
-        .table a:hover, button:hover {
-            background: linear-gradient(135deg, #4a4a8a, #6767b3);
-            color: #fff;
-        }
-        .book{
-            width: fit-content;
-            justify-content: center;
-            margin: 0 auto;
-            padding: 0px 15px;
-            margin-top: 3px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 0 15px black;
-            
-        }
-        .danger-btn-floating {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: red;
-            color: white;
-            border: none;
-            padding: 30px;
-            font-size: 18px;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        @media (max-width: 768px) {
+            .ride-card { flex-direction: column; text-align: left; }
+            .ride-card > div:last-child { text-align: left; margin-top: 15px; }
         }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Sofadi+One&display=swap" rel="stylesheet">
-    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <link rel="icon" href="images\favvi.png" type="image/x-icon">
 </head>
 <body>
-<nav class="navbar">
-    <div class="logo">
-        <img src="images/logo1.png" alt="logo" height="30%" width="30%">
+
+<?php include 'navbar.php'; ?>
+
+<div class="container">
+    <div class="page-header">
+        <h2>🎟️ My Booked Trips</h2>
+        <a href="find_ride.php" class="btn-find"><i class='bx bx-search'></i> Find More Rides</a>
     </div>
-    <img src="images/name.png" alt="logo" height="20%" width="20%">
-    <ul class="nav-links">
-        <li><a href="index.php">Home</a></li>
-        <li><a href="rides.php">Find</a></li>
-        <?php if (isset($_SESSION['user_id'])): ?>
-            <li><a href="post_ride.php">Post</a></li>
-            <li><a href="myrides.php">MyRides</a></li>
-            <li><a href="#" id="logout-link">Logout</a></li>
-            <li><a href="profile.php"><i class='bx bxs-user bx-sm'></i></a></li>
-        <?php else: ?>
-            <li><a href="login.php">Login</a></li>
-        <?php endif; ?>
-    </ul>
-</nav>
-<script>
-    document.getElementById('logout-link').addEventListener('click', function(e) {
-        e.preventDefault();
-        var confirmed = confirm('Are you sure you want to logout?');
-        if (confirmed) {
-            window.location.href = 'logout.php';
-        }
-    });
-</script>
-<br>
-<div class="book">
-<h2 style="text-align:center;font-family:font-family: 'Josefin Sans', sans-serif;">
-    My Booked Rides
-    <a href="myrides.php">
-        <button style="text-align:center;font-family: 'Josefin Sans', sans-serif;">My Posted rides</button>
-    </a>
-</h2>
-</div>
-<div class="table">
-    <?php if ($result->num_rows > 0): ?>
-        <table>
-            <tr>
-                <th>Origin</th>
-                <th>Destination</th>
-                <th>Ride Date</th>
-                <th>Vehicle Type</th>
-                <th>Seats Booked</th>
-                <th>Price</th>
-                <th>Driver Name</th>
-                <th>Driver Phone</th>
-                <th>Action</th>
-            </tr>
-            <?php while ($row = $result->fetch_assoc()): ?>
-                <tr>
-                    <td><?php echo $row['origin']; ?></td>
-                    <td><?php echo $row['destination']; ?></td>
-                    <td><?php echo $row['ride_date']; ?></td>
-                    <td><?php echo $row['vehicle_type']; ?></td>
-                    <td><?php echo $row['seats_booked']; ?></td>
-                    <td>₹<?php echo $row['price'] * $row['seats_booked']; ?></td>
-                    <td><?php echo $row['driver_name']; ?></td>
-                    <td><?php echo $row['driver_phone']; ?></td>
-                    <td>
-                        <a href="my_booked_rides.php?delete_id=<?php echo $row['booking_id']; ?>" onclick="return confirm('Are you sure you want to delete this booking?');">Delete</a>
-                    </td>
-                </tr>
+
+    <!-- Live Activity & Alerts Widget -->
+    <?php if ($notifications->num_rows > 0): ?>
+        <div class="alerts-widget-card">
+            <div class="widget-header">
+                <h3><i class='bx bxs-bell-ring' style="color:var(--primary-color);"></i> 🔔 Live Ride Activity & Alerts</h3>
+                <a href="notifications.php" style="color:var(--primary-color); font-size:13px; text-decoration:none; font-weight:600;">View All Alerts →</a>
+            </div>
+            <?php while ($notif = $notifications->fetch_assoc()): ?>
+                <div class="notif-item">
+                    <strong><?php echo htmlspecialchars($notif['title']); ?>:</strong> <?php echo htmlspecialchars($notif['message']); ?>
+                    <span style="font-size:12px; color:var(--text-muted); float:right;"><?php echo $notif['created_at']; ?></span>
+                </div>
             <?php endwhile; ?>
-        </table>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($result->num_rows > 0): ?>
+        <?php while ($ride = $result->fetch_assoc()): ?>
+            <?php 
+                $mapsUrl = "https://www.google.com/maps/search/?api=1&query=" . urlencode($ride['origin']);
+                
+                // Formatted WhatsApp Trip Details Share Text
+                $waShareText = "🚗 *FlexiRide Commute Share*\n" .
+                               "📍 Pickup: " . $ride['origin'] . "\n" .
+                               "🏁 Drop: " . $ride['destination'] . "\n" .
+                               "📅 Date & Time: " . $ride['ride_date'] . " at " . $ride['ride_time'] . "\n" .
+                               "👤 Driver: " . $ride['driver_name'] . " (" . $ride['driver_phone'] . ")\n" .
+                               "🚘 Vehicle: " . ($ride['vehicle_model'] ?: $ride['vehicle_type']) . "\n" .
+                               "📍 GPS Pickup Map: " . $mapsUrl;
+                
+                $waShareUrl = "https://api.whatsapp.com/send?text=" . urlencode($waShareText);
+
+                // Emergency SOS WhatsApp Alert Text
+                $sosText = "🚨 *EMERGENCY SOS ALERT - FlexiRide Safety*\n" .
+                           "⚠️ I am currently on a ride and need urgent assistance!\n" .
+                           "👤 Rider: " . ($userData['name'] ?? 'Rider') . " (" . ($userData['phone'] ?? '') . ")\n" .
+                           "🚗 Driver: " . $ride['driver_name'] . " (" . $ride['driver_phone'] . ")\n" .
+                           "🚘 Vehicle: " . ($ride['vehicle_model'] ?: $ride['vehicle_type']) . "\n" .
+                           "📍 Route: " . $ride['origin'] . " ➔ " . $ride['destination'] . "\n" .
+                           "📍 Live GPS Location: " . $mapsUrl;
+
+                $emPhone = preg_replace('/[^0-9]/', '', $userData['emergency_phone'] ?? '');
+                if (!empty($emPhone) && strlen($emPhone) == 10) {
+                    $emPhone = '91' . $emPhone;
+                }
+                $sosWaUrl = !empty($emPhone) 
+                    ? "https://api.whatsapp.com/send?phone=" . $emPhone . "&text=" . urlencode($sosText)
+                    : "https://api.whatsapp.com/send?text=" . urlencode($sosText);
+            ?>
+            <div class="ride-card">
+                <div>
+                    <div style="margin-bottom:8px;">
+                        <span class="status-badge status-confirmed">
+                            <i class='bx bxs-check-circle'></i> Status: <?php echo htmlspecialchars($ride['trip_status']); ?>
+                        </span>
+                    </div>
+                    <h3 style="font-size:20px; margin-bottom:6px;"><?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></h3>
+                    <p style="font-size:14px; color:var(--text-muted); margin-bottom:6px;">
+                        👤 Driver: <strong><?php echo htmlspecialchars($ride['driver_name']); ?></strong> (📞 <?php echo htmlspecialchars($ride['driver_phone']); ?>)
+                    </p>
+
+                    <!-- Vehicle Identification Badge -->
+                    <div class="vehicle-id-box">
+                        <span style="font-size:14px; font-weight:700; color:var(--primary-color);">
+                            <?php echo ($ride['vehicle_category'] === 'bike' ? '🏍️' : '🚗'); ?> 
+                            Vehicle: <?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_type']); ?>
+                        </span>
+                    </div>
+
+                    <p style="font-size:13px; color:var(--text-muted);">
+                        📅 <?php echo $ride['ride_date']; ?> at <?php echo $ride['ride_time']; ?>
+                        <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
+                            | Spare Helmet: <strong><?php echo ($ride['helmet_provided'] ?? 1) ? '🪖 Provided' : 'Bring Own'; ?></strong>
+                        <?php endif; ?>
+                    </p>
+                </div>
+
+                <div style="text-align:right;">
+                    <div style="font-size:24px; font-weight:700; color:var(--success-color); margin-bottom:10px;">₹<?php echo $ride['price']; ?></div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end;">
+                        <!-- WhatsApp Emergency SOS Button -->
+                        <a href="<?php echo $sosWaUrl; ?>" target="_blank" class="btn-sos-wa" title="Send Emergency SOS Alert via WhatsApp">
+                            <i class='bx bxs-alarm-exclamation'></i> 🚨 SOS WhatsApp
+                        </a>
+
+                        <!-- WhatsApp Share Ride Button -->
+                        <a href="<?php echo $waShareUrl; ?>" target="_blank" class="btn-wa-share" title="Share Ride Details on WhatsApp">
+                            <i class='bx bxl-whatsapp'></i> Share
+                        </a>
+
+                        <?php if (!empty($ride['driver_upi'])): ?>
+                            <button class="btn-pay-qr" onclick="showQrModal('<?php echo htmlspecialchars($ride['driver_upi']); ?>', '<?php echo $ride['price']; ?>', '<?php echo htmlspecialchars($ride['driver_name']); ?>')">
+                                <i class='bx bx-qr-scan'></i> Pay UPI
+                            </button>
+                        <?php endif; ?>
+
+                        <a href="<?php echo $mapsUrl; ?>" target="_blank" class="btn-nav-map"><i class='bx bxs-map-pin'></i> Pickup Spot</a>
+                        <a href="chat.php?ride_id=<?php echo $ride['id']; ?>" class="btn-chat"><i class='bx bx-message-rounded-dots'></i> Chat</a>
+                        <a href="receipt.php?booking_id=<?php echo $ride['booking_id']; ?>" class="btn-receipt"><i class='bx bxs-file-pdf'></i> Receipt</a>
+                        <a href="rate_ride.php?ride_id=<?php echo $ride['id']; ?>&driver_id=<?php echo $ride['user_id']; ?>" class="btn-chat" style="background:#f59e0b;">⭐ Rate</a>
+                    </div>
+                </div>
+            </div>
+        <?php endwhile; ?>
     <?php else: ?>
-        <p>No rides booked yet.</p>
+        <div style="text-align:center; padding:40px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:20px;">
+            <h3>No trips booked yet!</h3>
+            <p style="color:var(--text-muted); margin:10px 0 20px;">Find convenient bike or car rides for your daily commute.</p>
+            <a href="find_ride.php" class="btn-find">Browse Available Rides →</a>
+        </div>
     <?php endif; ?>
 </div>
-<?php if (isset($_SESSION['user_id'])): ?>
-    <button id="danger-link" class="danger-btn-floating" onclick="sendEmergencyAlert()">Emergency</button>
-    <?php endif; ?>
 
-
+<!-- QR Code Modal -->
+<div id="qrModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-bottom:10px;">📲 Pay Driver via UPI</h3>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:15px;" id="qrDriverTxt"></p>
+        <img id="qrImage" src="" alt="UPI QR Code" style="width:200px; height:200px; border-radius:12px; margin-bottom:15px; border:2px solid var(--primary-color);">
+        <p style="font-weight:700; color:var(--success-color); font-size:18px;" id="qrPriceTxt"></p>
+        <button onclick="closeQrModal()" style="margin-top:15px; padding:10px 20px; background:#ef4444; color:white; border:none; border-radius:8px; cursor:pointer;">Close QR</button>
+    </div>
+</div>
 
 <script>
-    // Add an event listener to the logout link
-    document.getElementById('danger-link').addEventListener('click', function(e) {
-        // Prevent the default action
-        e.preventDefault();
-        
-        // Display confirmation alert
-        var confirmed = confirm('Do you really want to share your location with your emergency emails');
-        
-        // If confirmed, redirect to logout.php
-        if (confirmed) {
-            window.location.href = 'danger.php';
-        }
-    });
+    function showQrModal(upiId, price, driverName) {
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(driverName)}&am=${price}&cu=INR`;
+        const qrApi = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiUrl)}`;
+        document.getElementById('qrImage').src = qrApi;
+        document.getElementById('qrDriverTxt').textContent = `Scan to pay ${driverName} (${upiId})`;
+        document.getElementById('qrPriceTxt').textContent = `Amount: ₹${price}`;
+        document.getElementById('qrModal').style.display = 'flex';
+    }
+
+    function closeQrModal() {
+        document.getElementById('qrModal').style.display = 'none';
+    }
 </script>
 </body>
 </html>

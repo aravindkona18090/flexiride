@@ -1,153 +1,73 @@
 <?php
-require 'resend.php';
 include 'db.php';
 session_start();
+include 'mailer.php';
 
-// Function to send OTP using PHPMailer
-function sendOtp($email, $otp)
-{
-    $emailBody = "
-    <h2>OTP Verification</h2>
-
-    <p>Hello,</p>
-
-    <p>Your OTP for verification is:</p>
-
-    <h1 style='font-size:32px;color:#2563eb;letter-spacing:5px;'>{$otp}</h1>
-
-    <p>This OTP is valid for 5 minutes.</p>
-
-    <p><strong>Do not share this OTP with anyone.</strong></p>
-
-    <br>
-
-    <p>Regards,<br><strong>FlexiRide Team</strong></p>
+function sendOtpEmail($toEmail, $otp) {
+    $html = "
+        <div style='font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9;'>
+            <div style='max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);'>
+                <h2 style='color: #ff4757; text-align: center;'>FlexiRide Verification</h2>
+                <p>Hello,</p>
+                <p>Your One-Time Password (OTP) for registration verification is:</p>
+                <div style='text-align: center; margin: 20px 0;'>
+                    <span style='font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #2ed573; background: #e8fae8; padding: 10px 20px; border-radius: 8px;'>$otp</span>
+                </div>
+                <p style='color: #777; font-size: 13px; text-align: center;'>This OTP is valid for 5 minutes. Do not share it with anyone.</p>
+            </div>
+        </div>
     ";
-
-    try {
-
-        sendResendEmail(
-            $email,
-            "FlexiRide User",
-            "Your OTP for Verification",
-            $emailBody
-        );
-
-        return true;
-
-    } catch (Exception $e) {
-
-        error_log("Resend Error: " . $e->getMessage());
-
-        return false;
-
-    }
+    return sendResendMail($toEmail, '', 'FlexiRide - Verification OTP', $html);
 }
-$home = false;
-// Handle form submissions
+
+$pending_user = $_SESSION['pending_registration'] ?? null;
+$user_email = $pending_user['email'] ?? ($_GET['email'] ?? '');
+
+$successMessage = "";
+$errorMessage = "";
+$verified = false;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['send_otp'])) {
-        // Generate a 4-digit OTP
-        $otp = rand(1000, 9999);
+        if (empty($user_email)) {
+            $errorMessage = "No email address found for verification. Please register again.";
+        } else {
+            $otp = rand(1000, 9999);
+            $_SESSION['otp'] = $otp;
+            $_SESSION['otp_timestamp'] = time();
 
-        // Save OTP in session
-        $_SESSION['otp'] = $otp;
-        $_SESSION['otp_timestamp'] = time();
-
-        // Use the default email for testing
-        if (isset($_GET['email'])) {
-            $email = $_GET['email'];
-            if (sendOtp($email, $otp)) {
-              $successMessage = "OTP sent successfully.";
-          } else {
-              $errorMessage = "Failed to send OTP. Please try again.";
-          }
+            if (sendOtpEmail($user_email, $otp)) {
+                $successMessage = "OTP sent successfully to " . htmlspecialchars($user_email);
+            } else {
+                $errorMessage = "Failed to send OTP. Please check email settings or try again.";
+            }
         }
-
-        // Send OTP
-        
     } elseif (isset($_POST['verify_otp'])) {
-        // Combine individual input fields into a single OTP value
-        $enteredOtp = $_POST['otp'] ?? '';
+        $enteredOtp = trim($_POST['otp'] ?? '');
 
-        // Check if OTP matches and has not expired
         if (isset($_SESSION['otp']) && $enteredOtp == $_SESSION['otp']) {
-            if (time() - $_SESSION['otp_timestamp'] > 300) { // 5 minutes expiration
+            if (time() - $_SESSION['otp_timestamp'] > 300) {
                 $errorMessage = "OTP expired. Please request a new one.";
-                $home = false;
                 unset($_SESSION['otp'], $_SESSION['otp_timestamp']);
             } else {
-                $successMessage = "OTP verified successfully!";
                 unset($_SESSION['otp'], $_SESSION['otp_timestamp']);
-                $homeLink = '<a href="login.php">Go to Home</a>';
-                $home = true;
-                if (isset($_GET['email'])) {
-                  $email = $_GET['email'];
-                  $username = $_GET['name'];
-                  $hashed_password = $_GET['password'];
-                  $phone = $_GET['phone'];
-                  $emailBody = "
-<h2>Welcome to FlexiRide!</h2>
+                $verified = true;
 
-<p>Dear User,</p>
-
-<p>Your registration has been completed successfully.</p>
-
-<h3>Account Details</h3>
-
-<ul>
-    <li><strong>Registered Email:</strong> {$email}</li>
-</ul>
-
-<p>Thank you for joining <strong>FlexiRide</strong>.</p>
-
-<p>You can now:</p>
-
-<ul>
-    <li>Post rides</li>
-    <li>Book rides</li>
-    <li>Manage your trips</li>
-    <li>Use emergency features</li>
-</ul>
-
-<p>We wish you safe and enjoyable journeys.</p>
-
-<p>Regards,<br><strong>FlexiRide Team</strong></p>
-";
-
-$sql = "INSERT INTO users (name, email, password, phone)
-        VALUES ('$username', '$email', '$hashed_password', '$phone')";
-
-if ($conn->query($sql) === TRUE) {
-
-    try {
-
-        sendResendEmail(
-            $email,
-            $username,
-            "Welcome to FlexiRide!",
-            $emailBody
-        );
-
-    } catch (Exception $e) {
-
-        error_log("Resend Error: " . $e->getMessage());
-
-    }
-
-} else {
-
-    $errorMessage = "Registration failed. Please try again.";
-    $home = false;
-
-}
+                if ($pending_user) {
+                    $stmt = $conn->prepare("INSERT INTO users (name, email, password, phone) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("ssss", $pending_user['name'], $pending_user['email'], $pending_user['password'], $pending_user['phone']);
+                    if ($stmt->execute()) {
+                        $successMessage = "Account verified and created successfully!";
+                        unset($_SESSION['pending_registration']);
+                    } else {
+                        $errorMessage = "Database insertion failed: " . $conn->error;
+                    }
+                } else {
+                    $successMessage = "OTP verified successfully!";
                 }
-                
-               
-                }
+            }
         } else {
-            $errorMessage = "Invalid OTP. Please try again.";
-            $home = false;
+            $errorMessage = "Invalid OTP code. Please try again.";
         }
     }
 }
@@ -158,178 +78,138 @@ if ($conn->query($sql) === TRUE) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTP Verification</title>
+  <title>OTP Verification - FlexiRide</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Your existing CSS */
-    .otp {
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+      min-height: 100vh;
       display: flex;
-      flex-direction: column;
       justify-content: center;
       align-items: center;
-      gap: 10px;
-      background: #00000000;
-      border-radius: 16px;
-      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
-      backdrop-filter: blur(8.2px);
-      -webkit-backdrop-filter: blur(8.2px);
-      border: 1px solid #369eff66;
-      width: 20em;
-      height: 20em;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      padding: 20px;
     }
-
-    .otp .content {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: auto;
-      margin-bottom: auto;
+    .card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
     }
-
-    .otp p {
-      color: #000000;
-      font-weight: bolder;
-      size: 10px;
-    }
-
-    .otp .path {
-      fill: #369eff;
-    }
-
-    .otp .svg {
-      filter: blur(20px);
-      z-index: -1;
-      position: absolute;
-      opacity: 50%;
-      animation: anim 3s infinite linear;
-    }
-
-    .otp .inp {
-      margin-left: auto;
-      margin-right: auto;
-      white-space: 4px;
-    }
-
-    .otp .input + .input {
-      margin-left: 0.3em;
-    }
-
-    .otp .input {
-        color: black;
-        height: 2.5em;
-        width: 2.5em;
-        float: left;
-        text-align: center;
-        background: #00000000;
-        outline: none;
-        border: 1px #369eff solid;
-        border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); 
-    }
-
-    .otp .input:focus {
+    .card h2 { font-size: 24px; margin-bottom: 10px; color: #38bdf8; }
+    .card p { font-size: 14px; color: #94a3b8; margin-bottom: 25px; }
+    .otp-inputs { display: flex; justify-content: center; gap: 10px; margin-bottom: 25px; }
+    .otp-inputs input {
+      width: 50px;
+      height: 60px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+      border-radius: 12px;
+      border: 2px solid #334155;
+      background: #0f172a;
+      color: #38bdf8;
       outline: none;
-      border: 1px #fff solid;
+      transition: all 0.3s ease;
     }
-
-    .otp .input:not(:placeholder-shown) {
-      opacity: 100%;
+    .otp-inputs input:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-
-    .otp button {
-      margin-left: auto;
-      margin-right: auto;
-      background-color: #00000000;
-      color: #000000;
-      width: 10em;
-      height: 3em;
-      border: #369eff 0.2em solid;
-      border-radius: 11px;
-      transition: all 0.5s ease;
-      font-size: 1em;
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+    .btn-secondary {
+      background: #334155;
+      margin-top: 15px;
     }
-
-    .otp button:hover {
-      background-color: #369eff;
-    }
-
-    @keyframes anim {
-    0% {
-        transform: rotate(0deg);
-    }
-    50% {
-        transform: rotate(180deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
+    .alert { padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; }
+    .alert-success { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; color: #4ade80; }
+    .alert-danger { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; }
+    a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <form class="otp" method="POST">
-    <div class="content">
-      <?php if (!isset($_SESSION['otp']) && $home == false): ?>
-          <!-- Show Send OTP button if no OTP is set in session -->
-          <button type="submit" name="send_otp">Send OTP</button>
-      <?php elseif (isset($_SESSION['otp'])): ?>
-          <!-- Show OTP Verification form if OTP is set but not yet verified -->
-          <p align="center">Verify OTP</p>
-          <div class="inp">
-            <input type="text" class="input" maxlength="1" required>
-            <input type="text" class="input" maxlength="1" required>
-            <input type="text" class="input" maxlength="1" required>
-            <input type="text" class="input" maxlength="1" required>
-          </div>
-          <button type="submit" name="verify_otp">Verify OTP</button>
-      <?php endif; ?>
-      <svg class="svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <path fill="#4073ff" d="M56.8,-23.9C61.7,-3.2,45.7,18.8,26.5,31.7C7.2,44.6,-15.2,48.2,-35.5,36.5C-55.8,24.7,-73.9,-2.6,-67.6,-25.2C-61.3,-47.7,-30.6,-65.6,-2.4,-64.8C25.9,-64.1,51.8,-44.7,56.8,-23.9Z" transform="translate(100 100)" class="path"></path>
-      </svg>
-      <!-- Display Messages -->
-      <?php if (isset($successMessage)): ?>
-          <div class="message">
-            <?php echo $successMessage; ?>
-            <?php if (isset($homeLink)): ?>
-              <p><?php echo $homeLink; ?></p>
-            <?php endif; ?>
-          </div>
-      <?php elseif (isset($errorMessage)): ?>
-          <div class="message"><?php echo $errorMessage; ?></div>
-      <?php endif; ?>
-    </div>
-  </form>
-</body>
-<script>
-    // Handle OTP input field focus and combination
-    const otpInputs = document.querySelectorAll('.otp .input');
-    const form = document.querySelector('.otp');
+  <div class="card">
+    <h2>🔒 OTP Verification</h2>
+    <p>Verify your email address for FlexiRide</p>
 
-    form.addEventListener('submit', (e) => {
-      let otp = '';
-      otpInputs.forEach(input => otp += input.value);
-      const hiddenInput = document.createElement('input');
-      hiddenInput.type = 'hidden';
-      hiddenInput.name = 'otp';
-      hiddenInput.value = otp;
-      form.appendChild(hiddenInput);
-    });
+    <?php if ($successMessage): ?>
+      <div class="alert alert-success"><?php echo htmlspecialchars($successMessage); ?></div>
+    <?php endif; ?>
 
-    otpInputs.forEach((input, index) => {
-      input.addEventListener('input', () => {
-        if (input.value.length === 1 && otpInputs[index + 1]) {
-          otpInputs[index + 1].focus();
+    <?php if ($errorMessage): ?>
+      <div class="alert alert-danger"><?php echo htmlspecialchars($errorMessage); ?></div>
+    <?php endif; ?>
+
+    <?php if ($verified): ?>
+      <div style="margin-top: 20px;">
+        <p style="color: #4ade80; font-size: 18px; font-weight: 600;">✨ Email Successfully Verified!</p>
+        <a href="login.php" class="btn" style="display: inline-block; text-align: center; margin-top: 15px;">Proceed to Login</a>
+      </div>
+    <?php else: ?>
+      <form method="POST" id="otpForm">
+        <?php if (!isset($_SESSION['otp'])): ?>
+          <p>Click below to send a 4-digit OTP to <strong><?php echo htmlspecialchars($user_email ?: 'your email'); ?></strong></p>
+          <button type="submit" name="send_otp" class="btn">Send Verification OTP</button>
+        <?php else: ?>
+          <div class="otp-inputs">
+            <input type="text" maxlength="1" class="otp-box" autofocus>
+            <input type="text" maxlength="1" class="otp-box">
+            <input type="text" maxlength="1" class="otp-box">
+            <input type="text" maxlength="1" class="otp-box">
+          </div>
+          <button type="submit" name="verify_otp" class="btn">Verify OTP</button>
+          <button type="submit" name="send_otp" class="btn btn-secondary">Resend OTP</button>
+        <?php endif; ?>
+      </form>
+    <?php endif; ?>
+  </div>
+
+  <script>
+    const boxes = document.querySelectorAll('.otp-box');
+    const form = document.getElementById('otpForm');
+
+    boxes.forEach((box, idx) => {
+      box.addEventListener('input', (e) => {
+        if (box.value.length === 1 && idx < boxes.length - 1) {
+          boxes[idx + 1].focus();
         }
       });
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && input.value === '' && otpInputs[index - 1]) {
-          otpInputs[index - 1].focus();
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && box.value === '' && idx > 0) {
+          boxes[idx - 1].focus();
         }
       });
     });
+
+    if (form) {
+      form.addEventListener('submit', () => {
+        if (boxes.length > 0) {
+          let fullOtp = '';
+          boxes.forEach(b => fullOtp += b.value);
+          let hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'otp';
+          hiddenInput.value = fullOtp;
+          form.appendChild(hiddenInput);
+        }
+      });
+    }
   </script>
+</body>
 </html>
