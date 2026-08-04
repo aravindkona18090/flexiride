@@ -167,9 +167,9 @@ http://localhost/FlexiRide
 
 ---
 
+
 ## 📸 Screenshots
 
-Create a folder named:
 
 ```
 screenshots/
