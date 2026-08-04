@@ -21,6 +21,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 AND (? = '' OR r.gender_preference = 'female_only')
                 AND r.user_id != ? 
                 AND r.seats_available > 0 
+                AND (r.trip_status IS NULL OR r.trip_status != 'cancelled')
+                AND r.ride_date >= CURDATE()
               ORDER BY r.ride_date ASC, r.ride_time ASC";
 
     $stmt = $conn->prepare($query);

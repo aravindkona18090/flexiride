@@ -8,6 +8,33 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
+$cancelMsg = "";
+
+// Handle Cancel Booking by Passenger (Restores Seats & Notifies Driver)
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cancel_booking_id'])) {
+    $b_id = (int)$_POST['cancel_booking_id'];
+    
+    $bQuery = $conn->prepare("SELECT b.*, r.user_id as driver_id, r.origin, r.destination FROM bookings b JOIN rides r ON b.ride_id = r.id WHERE b.id = ? AND b.user_id = ?");
+    $bQuery->bind_param("ii", $b_id, $user_id);
+    $bQuery->execute();
+    $bData = $bQuery->get_result()->fetch_assoc();
+    
+    if ($bData && $bData['trip_status'] !== 'Cancelled') {
+        $cUp = $conn->prepare("UPDATE bookings SET trip_status = 'Cancelled' WHERE id = ?");
+        $cUp->bind_param("i", $b_id);
+        $cUp->execute();
+        
+        $rUp = $conn->prepare("UPDATE rides SET seats_available = seats_available + ? WHERE id = ?");
+        $rUp->bind_param("ii", $bData['seats_booked'], $bData['ride_id']);
+        $rUp->execute();
+        
+        $nStmt = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, 'Passenger Cancelled Booking', 'A passenger cancelled their booking for your ride from {$bData['origin']} to {$bData['destination']}. Seats restored.')");
+        $nStmt->bind_param("i", $bData['driver_id']);
+        $nStmt->execute();
+        
+        $cancelMsg = "Your booking has been cancelled and seats restored to the ride.";
+    }
+}
 
 // Fetch User Data for Emergency SOS WhatsApp
 $uStmt = $conn->prepare("SELECT u.*, uc.emergency_phone, uc.emergency_email1 FROM users u LEFT JOIN user_emergency_contacts uc ON u.id = uc.user_id WHERE u.id = ?");
@@ -217,6 +244,13 @@ $result = $stmt->get_result();
                         <a href="chat.php?ride_id=<?php echo $ride['id']; ?>" class="btn-chat"><i class='bx bx-message-rounded-dots'></i> Chat</a>
                         <a href="receipt.php?booking_id=<?php echo $ride['booking_id']; ?>" class="btn-receipt"><i class='bx bxs-file-pdf'></i> Receipt</a>
                         <a href="rate_ride.php?ride_id=<?php echo $ride['id']; ?>&driver_id=<?php echo $ride['user_id']; ?>" class="btn-chat" style="background:#f59e0b;">⭐ Rate</a>
+
+                        <?php if ($ride['trip_status'] !== 'Cancelled'): ?>
+                            <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this booking? Seats will be restored to the driver.');">
+                                <input type="hidden" name="cancel_booking_id" value="<?php echo $ride['booking_id']; ?>">
+                                <button type="submit" class="btn-sos-wa" style="background:#dc2626;" title="Cancel Booking"><i class='bx bx-x-circle'></i> Cancel</button>
+                            </form>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

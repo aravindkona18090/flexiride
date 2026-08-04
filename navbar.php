@@ -115,6 +115,8 @@ if (isset($_SESSION['user_id'])) {
     }
 
     .navbar {
+        width: 100%;
+        box-sizing: border-box;
         background: var(--card-bg);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);

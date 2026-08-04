@@ -26,6 +26,7 @@ function safeAddColumn($conn, $table, $column, $definition) {
 safeAddColumn($conn, 'users', 'profile_photo', "VARCHAR(255) NULL");
 safeAddColumn($conn, 'vehicles', 'total_seats', "INT NOT NULL DEFAULT 5");
 safeAddColumn($conn, 'rides', 'route_distance', "DECIMAL(8,2) NOT NULL DEFAULT 25.00");
+safeAddColumn($conn, 'rides', 'trip_status', "VARCHAR(50) NOT NULL DEFAULT 'active'");
 safeAddColumn($conn, 'bookings', 'total_price', "DECIMAL(10,2) NOT NULL DEFAULT 0.00");
 safeAddColumn($conn, 'bookings', 'posted_email', "VARCHAR(150) NULL");
 safeAddColumn($conn, 'bookings', 'booked_email', "VARCHAR(150) NULL");
