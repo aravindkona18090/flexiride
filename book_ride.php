@@ -1,8 +1,5 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require 'vendor/autoload.php';
+require 'resend.php';
 include 'db.php';
 session_start();
 
@@ -19,13 +16,15 @@ if (isset($_GET['ride_id'])) {
 
         $ride_sql = "SELECT * FROM rides WHERE id = $ride_id";
         $ride_result = $conn->query($ride_sql);
-        
+
         if ($ride_result->num_rows > 0) {
             $ride = $ride_result->fetch_assoc();
-            $current_user_id = $user_id = $_SESSION['user_id'];
-            $user_sql = "SELECT email,name,phone FROM users WHERE id = $current_user_id";
+
+            $current_user_id = $_SESSION['user_id'];
+
+            $user_sql = "SELECT email, name, phone FROM users WHERE id = $current_user_id";
             $user_result = $conn->query($user_sql);
-            
+
             if ($user_result->num_rows > 0) {
                 $user = $user_result->fetch_assoc();
                 $user_email = $user['email'];
@@ -36,120 +35,117 @@ if (isset($_GET['ride_id'])) {
                 exit();
             }
 
-            $posted_user_id = $ride['user_id']; 
-            $posted_user_sql = "SELECT email,name,phone FROM users WHERE id = $posted_user_id";
+            $posted_user_id = $ride['user_id'];
+
+            $posted_user_sql = "SELECT email, name, phone FROM users WHERE id = $posted_user_id";
             $posted_user_result = $conn->query($posted_user_sql);
-            
+
             if ($posted_user_result->num_rows > 0) {
                 $posted_user = $posted_user_result->fetch_assoc();
                 $posted_user_email = $posted_user['email'];
-                $posted_user_name  = $posted_user['name'];
-                $posted_user_phone = $posted_user['phone']; 
+                $posted_user_name = $posted_user['name'];
+                $posted_user_phone = $posted_user['phone'];
             } else {
                 echo "Posted user not found.";
                 exit();
             }
 
             if ($ride['seats_available'] >= $seats_booked) {
+
                 $new_seats = $ride['seats_available'] - $seats_booked;
+
                 $update_sql = "UPDATE rides SET seats_available = $new_seats, posted_email = '$posted_user_email' WHERE id = $ride_id";
                 $conn->query($update_sql);
 
-                $booking_sql = "INSERT INTO bookings (user_id, ride_id, seats_booked, posted_email, booked_email) 
+                $booking_sql = "INSERT INTO bookings (user_id, ride_id, seats_booked, posted_email, booked_email)
                                 VALUES ('$current_user_id', '$ride_id', '$seats_booked', '$posted_user_email', '$user_email')";
-                if ($conn->query($booking_sql) === TRUE) {
-                    try {
-                        $mail = new PHPMailer(true);
-                        
-                        $mail->isSMTP();
-                        $mail->Host = 'smtp.gmail.com';               
-                        $mail->SMTPAuth = true;                        
-                        $mail->Username = 'flexiride247@gmail.com';   
-                        $mail->Password = 'lhyzlfabuyopgkqo';          
-                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-                        $mail->Port = 587;                             
-                        $mail->setFrom('flexiride247@gmail.com', 'FlexiRide'); 
-                        $mail->addAddress($posted_user_email);                    
-                    
-                        
-                        $mail->isHTML(true); 
-                        $mail->Subject = 'Your Ride Details - FlexiRide';
-                        $mail->Body = "
-                            <h2>Dear User,</h2>
-                            <p>Your ride is sucessfully booked on <strong>FlexiRide</strong>.</p>
-                            <h3>Ride Details:</h3>
-                            <ul>
-                                <li><strong>Booked User name:</strong>  $user_name </li>
-                                <li><strong>Booked User Phone Number:</strong> $user_phone</li>
-                                <li><strong>Seats Booked: </strong>  $seats_booked</li>
-                                <li><strong>Seats Available:</strong> $new_seats</li>
-                            </ul>
-                            <p>Be puntual, Ride safe, Follow traffic rules.</p>
-                            <p>If any emergency click on emergency button in our website.</p>
-                            <p>Thank you for using FlexiRide.</p>
-                            <p>Regards,<br>FlexiRide Team</p>
-                        ";
-                    
-                        $mail->send();
-                        
-                    } catch (Exception $e) {
-                        
-                        echo "Error sending email: " . $mail->ErrorInfo;
-                        error_log("Email sending error: " . $mail->ErrorInfo);
-                    }
-                    try {
-                        $mail = new PHPMailer(true);
-                        $mail->isSMTP();
-                        $mail->Host = 'smtp.gmail.com';
-                        $mail->SMTPAuth = true;         
-                        $mail->Username = 'flexiride247@gmail.com';   
-                        $mail->Password = 'lhyzlfabuyopgkqo';     
-                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-                        $mail->Port = 587;                             
-                    
-                        $mail->setFrom('flexiride247@gmail.com', 'FlexiRide'); 
-                        $mail->addAddress($user_email);                        
-                    
-                        $mail->isHTML(true); 
-                        $mail->Subject = 'Your Ride Details - FlexiRide';
-                        $mail->Body = "
-                            <h2>Dear User,</h2>
-                            <p>Your ride is sucessfully booked on <strong>FlexiRide</strong>.</p>
-                            <h3>Ride Details:</h3>
-                            <ul>
-                                <li><strong>Posted User name:</strong>  $posted_user_name </li>
-                                <li><strong>Posted User Phone Number:</strong> $posted_user_phone</li>
-                                <li><strong>Seats Booked: </strong>  $seats_booked</li>
-                            </ul>
-                            <p>Be puntual, Be safe .</p>
-                            <p>If any emergency click on emergency button in our website.</p>
-                            <p>Thank you for using FlexiRide.</p>
-                            <p>Regards,<br>FlexiRide Team</p>
-                        ";
-                    
-                        $mail->send();
-                        header("Location: booking_success.php?ride_id=$ride_id");
-                        exit();
-                        
-                    } catch (Exception $e) {
-                        echo "Error sending email: " . $mail->ErrorInfo; 
-                        error_log("Email sending error: " . $mail->ErrorInfo); 
-                    }
-                    header("Location: booking_success.php?ride_id=$ride_id");
 
+                if ($conn->query($booking_sql) === TRUE) {
+
+                    // Email to Ride Owner
+                    $emailBody = "
+                    <h2>Dear {$posted_user_name},</h2>
+
+                    <p>Your ride has been booked successfully on <strong>FlexiRide</strong>.</p>
+
+                    <h3>Booking Details:</h3>
+
+                    <ul>
+                        <li><strong>Booked User Name:</strong> {$user_name}</li>
+                        <li><strong>Booked User Phone Number:</strong> {$user_phone}</li>
+                        <li><strong>Seats Booked:</strong> {$seats_booked}</li>
+                        <li><strong>Seats Remaining:</strong> {$new_seats}</li>
+                    </ul>
+
+                    <p>Please be punctual and have a safe journey.</p>
+
+                    <p>Thank you for using <strong>FlexiRide</strong>.</p>
+
+                    <p>Regards,<br>FlexiRide Team</p>
+                    ";
+
+                    try {
+                        sendResendEmail(
+                            $posted_user_email,
+                            $posted_user_name,
+                            "Your Ride Has Been Booked - FlexiRide",
+                            $emailBody
+                        );
+                    } catch (Exception $e) {
+                        error_log("Resend Error: " . $e->getMessage());
+                    }
+
+                    // Email to Passenger
+                    $emailBody = "
+                    <h2>Dear {$user_name},</h2>
+
+                    <p>Your ride has been booked successfully on <strong>FlexiRide</strong>.</p>
+
+                    <h3>Ride Details:</h3>
+
+                    <ul>
+                        <li><strong>Ride Owner:</strong> {$posted_user_name}</li>
+                        <li><strong>Phone Number:</strong> {$posted_user_phone}</li>
+                        <li><strong>Seats Booked:</strong> {$seats_booked}</li>
+                    </ul>
+
+                    <p>Please be punctual and have a safe journey.</p>
+
+                    <p>If there is an emergency, use the Emergency button in the FlexiRide app.</p>
+
+                    <p>Thank you for using <strong>FlexiRide</strong>.</p>
+
+                    <p>Regards,<br>FlexiRide Team</p>
+                    ";
+
+                    try {
+                        sendResendEmail(
+                            $user_email,
+                            $user_name,
+                            "Ride Booking Confirmation - FlexiRide",
+                            $emailBody
+                        );
+                    } catch (Exception $e) {
+                        error_log("Resend Error: " . $e->getMessage());
+                    }
+
+                    header("Location: booking_success.php?ride_id=$ride_id");
                     exit();
+
                 } else {
                     echo "Error: " . $booking_sql . "<br>" . $conn->error;
                 }
-                
+
             } else {
                 echo "Not enough seats available!";
             }
+
         } else {
             echo "Ride not found.";
             exit();
         }
     }
+
 } else {
     echo "Invalid Ride ID.";
 }

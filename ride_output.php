@@ -1,8 +1,5 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require 'vendor/autoload.php';
+require 'resend.php';
 session_start();
 
 include 'db.php';
@@ -247,42 +244,47 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $update_sql = "UPDATE rides SET posted_email = '$userEmail' WHERE id = '$userId'";
                 $conn->query($update_sql);
 
-                try {
-                    $mail = new PHPMailer(true);
-                    $mail->isSMTP();
-                    $mail->Host = 'smtp.gmail.com';              
-                    $mail->SMTPAuth = true;                        
-                    $mail->Username = 'flexiride247@gmail.com';   
-                    $mail->Password = 'lhyzlfabuyopgkqo';         
-                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-                    $mail->Port = 587;                            
+                $emailBody = "
+<h2>Dear User,</h2>
 
-                    $mail->setFrom('flexiride247@gmail.com', 'FlexiRide'); 
-                    $mail->addAddress($userEmail);   
-                    $mail->isHTML(true); 
-                    $mail->Subject = 'Your Ride Details - FlexiRide';
-                    $mail->Body = 
-                        "<h2>Dear User,</h2>
-                        <p>You have successfully posted a ride on <strong>FlexiRide</strong>.</p>
-                        <h3>Ride Details:</h3>
-                        <ul>
-                            <li><strong>Origin:</strong> $origin</li>
-                            <li><strong>Destination:</strong> $destination</li>
-                            <li><strong>Ride Date:</strong> $ride_date</li>
-                            <li><strong>Ride Time:</strong> $ride_time</li>
-                            <li><strong>Vehicle Type:</strong> $vehicle_type</li>
-                            <li><strong>Seats Available:</strong> $seats_available</li>
-                            <li><strong>Price per seat:</strong> ₹$price</li>
-                            <li><strong>Distance:</strong> $distance km</li>
-                        </ul>
-                        <p>Thank you for using FlexiRide.</p>
-                        <p>Regards,<br>FlexiRide Team</p>";
+<p>You have successfully posted a ride on <strong>FlexiRide</strong>.</p>
 
-                    $mail->send();
-                    $successMessage = "Ride Submitted! Your custom price is ₹$price. you will be charged  ₹10.₹5 for Insurence and Convinenece Fee :₹5 . Distance is $distance km.";
-                } catch (Exception $e) {
-                    $errorMessage = "Error sending email: {$mail->ErrorInfo}";
-                }
+<h3>Ride Details:</h3>
+
+<ul>
+    <li><strong>Origin:</strong> {$origin}</li>
+    <li><strong>Destination:</strong> {$destination}</li>
+    <li><strong>Ride Date:</strong> {$ride_date}</li>
+    <li><strong>Ride Time:</strong> {$ride_time}</li>
+    <li><strong>Vehicle Type:</strong> {$vehicle_type}</li>
+    <li><strong>Seats Available:</strong> {$seats_available}</li>
+    <li><strong>Price per Seat:</strong> ₹{$price}</li>
+    <li><strong>Distance:</strong> {$distance} km</li>
+</ul>
+
+<p>Thank you for using <strong>FlexiRide</strong>.</p>
+
+<p>Regards,<br><strong>FlexiRide Team</strong></p>
+";
+
+try {
+
+    sendResendEmail(
+        $userEmail,
+        $userName,
+        "Your Ride Details - FlexiRide",
+        $emailBody
+    );
+
+    $successMessage = "Ride Submitted! Your custom price is ₹$price. You will be charged ₹10 (₹5 Insurance + ₹5 Convenience Fee). Distance is $distance km.";
+
+} catch (Exception $e) {
+
+    error_log("Resend Error: " . $e->getMessage());
+
+    $errorMessage = "Ride posted successfully, but email could not be sent.";
+
+}
             } else {
                 $errorMessage = "Error: Unable to fetch user email.";
             }

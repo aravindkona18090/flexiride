@@ -1,10 +1,7 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
+require 'resend.php';
 include 'db.php';
 session_start();
-require 'vendor/autoload.php';
 
 // Ensure user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -14,6 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // Fetch user data from the database
 $user_id = $_SESSION['user_id'];
+
 $query = "SELECT * FROM users WHERE id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $user_id);
@@ -26,60 +24,84 @@ if ($result->num_rows > 0) {
     $user = [];
 }
 
-// Handle form submission to update profile
+// Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $phone = $_POST['phone'];
-    $emergency_email1 = $_POST['emergency_email1'];
-    $emergency_email2 = $_POST['emergency_email2'];
 
-    // Update query to modify user information
-    $update_query = "UPDATE users SET name = ?, email = ?, phone = ?, emergency_email1 = ?, emergency_email2 = ? WHERE id = ?";
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
+    $emergency_email1 = trim($_POST['emergency_email1']);
+    $emergency_email2 = trim($_POST['emergency_email2']);
+
+    // Update profile
+    $update_query = "UPDATE users
+                     SET name = ?, email = ?, phone = ?, emergency_email1 = ?, emergency_email2 = ?
+                     WHERE id = ?";
+
     $update_stmt = $conn->prepare($update_query);
-    $update_stmt->bind_param("sssssi", $name, $email, $phone, $emergency_email1, $emergency_email2, $user_id);
+    $update_stmt->bind_param(
+        "sssssi",
+        $name,
+        $email,
+        $phone,
+        $emergency_email1,
+        $emergency_email2,
+        $user_id
+    );
 
     if ($update_stmt->execute()) {
-        // Send email notification with updated values
-        $mail = new PHPMailer(true);
+
+        $emailBody = "
+        <h2>Profile Updated Successfully</h2>
+
+        <p>Dear <strong>{$name}</strong>,</p>
+
+        <p>Your FlexiRide profile has been updated successfully.</p>
+
+        <h3>Your Updated Details</h3>
+
+        <ul>
+            <li><strong>Name:</strong> {$name}</li>
+            <li><strong>Email:</strong> {$email}</li>
+            <li><strong>Phone:</strong> {$phone}</li>
+            <li><strong>Emergency Email 1:</strong> {$emergency_email1}</li>
+            <li><strong>Emergency Email 2:</strong> {$emergency_email2}</li>
+        </ul>
+
+        <p>
+            If you did not make these changes, please contact the FlexiRide support team immediately.
+        </p>
+
+        <br>
+
+        <p>
+            Regards,<br>
+            <strong>FlexiRide Team</strong>
+        </p>
+        ";
+
         try {
-            $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';              
-            $mail->SMTPAuth = true;                        
-            $mail->Username = 'flexiride247@gmail.com';   
-            $mail->Password = 'lhyzlfabuyopgkqo';         
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-            $mail->Port = 587;                            
 
-            $mail->setFrom('flexiride247@gmail.com', 'FlexiRide'); 
-            $mail->addAddress($email);
+            sendResendEmail(
+                $email,
+                $name,
+                "Profile Updated Successfully",
+                $emailBody
+            );
 
-            $mail->isHTML(true);
-            $mail->Subject = 'Profile Updated Successfully';
-            $mail->Body = "<h2>Profile Updated</h2>
-                <p>Dear $name,</p>
-                <p>Your profile has been successfully updated. Below are your new details:</p>
-                <ul>
-                    <li><strong>Name:</strong> $name</li>
-                    <li><strong>Email:</strong> $email</li>
-                    <li><strong>Phone:</strong> $phone</li>
-                    <li><strong>Emergency Email 1:</strong> $emergency_email1</li>
-                    <li><strong>Emergency Email 2:</strong> $emergency_email2</li>
-                </ul>
-                <p>If you did not make these changes, please contact our support team immediately.</p>
-                <p>Thank you,</p>
-                <p>YourAppName Team</p>";
-
-            $mail->send();
         } catch (Exception $e) {
-            echo "Error sending email: {$mail->ErrorInfo}";
+
+            error_log("Resend Error: " . $e->getMessage());
+
         }
 
-        // Redirect back to the profile page with a success message
         header("Location: profile.php?message=Profile updated successfully!");
         exit();
+
     } else {
+
         $message = "Error updating profile.";
+
     }
 }
 ?>

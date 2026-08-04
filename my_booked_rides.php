@@ -1,11 +1,7 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
+require 'resend.php';
 include 'db.php';
 session_start();
-
-require 'vendor/autoload.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -56,76 +52,99 @@ if (isset($_GET['delete_id'])) {
             $user_stmt->close();
 
             // Send notification to the ride poster
-            $mail = new PHPMailer(true);
-            try {
-                $mail->isSMTP();
-                $mail->Host = 'smtp.gmail.com';
-                $mail->SMTPAuth = true;
-                $mail->Username = 'flexiride247@gmail.com'; // Use a secure source
-                $mail->Password = 'lhyzlfabuyopgkqo';      // Use environment variables instead
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port = 587;
+            $emailBody = "
+<h2>Ride Cancellation Notification</h2>
 
-                $mail->setFrom('flexiride247@gmail.com', 'FlexiRide');
-                $mail->addAddress($email);
-                $mail->isHTML(true);
-                $mail->Subject = 'Ride Cancellation Notification';
-                $mail->Body = "<h2>Dear User,</h2>
-                    <p>We regret to inform you that a ride you posted has had a cancellation. Below are the details of the canceled user:</p>
-                    <ul>
-                        <li><strong>Name:</strong> {$detail['name']}</li>
-                        <li><strong>Email:</strong> {$detail['email']}</li>
-                        <li><strong>Phone:</strong> {$detail['phone']}</li>
-                    </ul>
-                    <p>Here are the ride details:</p>
-                    <ul>
-                        <li><strong>Origin:</strong> {$ride['origin']}</li>
-                        <li><strong>Destination:</strong> {$ride['destination']}</li>
-                        <li><strong>Ride Date:</strong> {$ride['ride_date']}</li>
-                        <li><strong>Ride Time:</strong> {$ride['ride_time']}</li>
-                        <li><strong>Seats Canceled:</strong> {$seats_booked}</li>
-                    </ul>
-                    <p>We apologize for any inconvenience caused. For further assistance, please contact our support team.</p>
-                    <p>Thank you for choosing FlexiRide!</p>
-                    <p>Regards,<br>FlexiRide Team</p>";
-                $mail->send();
-            } catch (Exception $e) {
-                echo "Error sending email: {$mail->ErrorInfo}";
-            }
+<p>A passenger has cancelled their booking.</p>
+
+<h3>Passenger Details</h3>
+
+<ul>
+    <li><strong>Name:</strong> {$detail['name']}</li>
+    <li><strong>Email:</strong> {$detail['email']}</li>
+    <li><strong>Phone:</strong> {$detail['phone']}</li>
+</ul>
+
+<h3>Ride Details</h3>
+
+<ul>
+    <li><strong>Origin:</strong> {$ride['origin']}</li>
+    <li><strong>Destination:</strong> {$ride['destination']}</li>
+    <li><strong>Ride Date:</strong> {$ride['ride_date']}</li>
+    <li><strong>Ride Time:</strong> {$ride['ride_time']}</li>
+    <li><strong>Seats Cancelled:</strong> {$seats_booked}</li>
+</ul>
+
+<p>The cancelled seats have been added back to your ride.</p>
+
+<p>Regards,<br><strong>FlexiRide Team</strong></p>
+";
+
+try {
+
+    sendResendEmail(
+        $email,
+        "Ride Owner",
+        "Ride Cancellation Notification",
+        $emailBody
+    );
+
+} catch (Exception $e) {
+
+    error_log("Resend Error: " . $e->getMessage());
+
+}
 
             // Send notification to the user who canceled the ride
-            $mail = new PHPMailer(true);
-            try {
-                $mail->isSMTP();
-                $mail->Host = 'smtp.gmail.com';
-                $mail->SMTPAuth = true;
-                $mail->Username = 'flexiride247@gmail.com';
-                $mail->Password = 'lhyzlfabuyopgkqo';
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port = 587;
+            $emailBody = "
+<h2>Ride Booking Cancelled</h2>
 
-                $mail->setFrom('flexiride247@gmail.com', 'FlexiRide');
-                $mail->addAddress($detail['email']);
-                $mail->isHTML(true);
-                $mail->Subject = 'Ride Booking Cancellation Confirmation';
-                $mail->Body = "<h2>Dear {$detail['name']},</h2>
-                    <p>Your booking for the following ride has been canceled. If you did not initiate this cancellation, please contact us immediately:</p>
-                    <ul>
-                        <li><strong>Origin:</strong> {$ride['origin']}</li>
-                        <li><strong>Destination:</strong> {$ride['destination']}</li>
-                        <li><strong>Ride Date:</strong> {$ride['ride_date']}</li>
-                        <li><strong>Ride Time:</strong> {$ride['ride_time']}</li>
-                        <li><strong>Seats Canceled:</strong> {$seats_booked}</li>
-                    </ul>
-                    <p>For any questions or assistance, feel free to reach out to our support team.</p>
-                    <p>Thank you for choosing FlexiRide!</p>
-                    <p>Regards,<br>FlexiRide Team</p>";
-                $mail->send();
+<p>Dear {$detail['name']},</p>
 
-                echo "<script>alert('Ride booking deleted successfully! Email notifications sent.'); window.location.href = 'my_booked_rides.php';</script>";
-            } catch (Exception $e) {
-                echo "Error sending email to user: {$mail->ErrorInfo}";
-            }
+<p>Your ride booking has been cancelled successfully.</p>
+
+<h3>Ride Details</h3>
+
+<ul>
+    <li><strong>Origin:</strong> {$ride['origin']}</li>
+    <li><strong>Destination:</strong> {$ride['destination']}</li>
+    <li><strong>Ride Date:</strong> {$ride['ride_date']}</li>
+    <li><strong>Ride Time:</strong> {$ride['ride_time']}</li>
+    <li><strong>Seats Cancelled:</strong> {$seats_booked}</li>
+</ul>
+
+<p>If you did not perform this cancellation, please contact FlexiRide support immediately.</p>
+
+<p>Thank you for using <strong>FlexiRide</strong>.</p>
+
+<p>Regards,<br><strong>FlexiRide Team</strong></p>
+";
+
+try {
+
+    sendResendEmail(
+        $detail['email'],
+        $detail['name'],
+        "Ride Booking Cancellation Confirmation",
+        $emailBody
+    );
+
+    echo "<script>
+            alert('Ride booking deleted successfully! Email notifications sent.');
+            window.location.href='my_booked_rides.php';
+          </script>";
+
+} catch (Exception $e) {
+
+    error_log("Resend Error: " . $e->getMessage());
+
+    echo "<script>
+            alert('Ride booking deleted successfully.');
+            window.location.href='my_booked_rides.php';
+          </script>";
+
+          exit()
+}
         } else {
             echo "Error deleting booking: " . $conn->error;
         }

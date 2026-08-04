@@ -1,12 +1,17 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require 'vendor/autoload.php'; // Ensure this file exists and PHPMailer is installed
+require 'resend.php';
 
 session_start();
-include 'db.php';  // Include database if required
+include 'db.php';
+
+// Ensure the user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
+
 $user_id = $_SESSION['user_id'];
+
 $query = "SELECT * FROM users WHERE id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $user_id);
@@ -17,65 +22,94 @@ $result = $stmt->get_result();
 if ($result->num_rows > 0) {
     $user = $result->fetch_assoc();
 } else {
-    // Handle case where user is not found
-    $user = []; // Ensure $user is an empty array if no user is found
+    $user = [];
 }
 
 // Handle the danger button click
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_danger_email'])) {
+
     $emergencyEmail1 = $user['emergency_email1'];
     $emergencyEmail2 = $user['emergency_email2'];
-    $emergencyEmails = [$emergencyEmail1, $emergencyEmail2, $user['email']];
+
+    $emergencyEmails = [
+        $emergencyEmail1,
+        $emergencyEmail2,
+        $user['email']
+    ];
+
     $latitude = $_POST['latitude'] ?? 'Unknown';
     $longitude = $_POST['longitude'] ?? 'Unknown';
 
     foreach ($emergencyEmails as $email) {
-        sendEmergencyEmail($email, $latitude, $longitude);
+
+        if (!empty($email)) {
+            sendEmergencyEmail($email, $latitude, $longitude);
+        }
     }
-    
-    // After sending the emails, set the session alert message
+
     $_SESSION['alert_message'] = "Emergency emails have been sent successfully!";
-    // Redirect after sending emails
-    header('Location: index.php'); // Redirect to index.php after the operation
-    exit(); // Ensure no further code is executed after the redirect
+
+    header("Location: index.php");
+    exit();
 }
 
-// Function to send the emergency email
-function sendEmergencyEmail($toEmail, $latitude, $longitude) {
-    $mail = new PHPMailer(true);
+/**
+ * Send Emergency Email using Resend
+ */
+function sendEmergencyEmail($toEmail, $latitude, $longitude)
+{
+    $googleMapsLink = "https://www.google.com/maps?q={$latitude},{$longitude}";
+
+    $emailBody = "
+        <h1 style='color:red;'>🚨 Emergency Alert</h1>
+
+        <p>
+            A FlexiRide user has triggered an <strong>Emergency Alert</strong>.
+        </p>
+
+        <p><strong>Current Location:</strong></p>
+
+        <ul>
+            <li><strong>Latitude:</strong> {$latitude}</li>
+            <li><strong>Longitude:</strong> {$longitude}</li>
+        </ul>
+
+        <p>
+            <a href='{$googleMapsLink}' target='_blank'
+               style='background:#d32f2f;color:#fff;padding:10px 18px;
+               text-decoration:none;border-radius:5px;'>
+               View Live Location
+            </a>
+        </p>
+
+        <br>
+
+        <p>
+            Please contact the user immediately if necessary.
+        </p>
+
+        <p>
+            Regards,<br>
+            <strong>FlexiRide Emergency System</strong>
+        </p>
+    ";
 
     try {
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'flexiride247@gmail.com';
-        $mail->Password   = 'lhyzlfabuyopgkqo';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
 
-        $mail->setFrom('flexiride247@gmail.com', 'FlexiRide Emergency');
-        $mail->addAddress($toEmail);
+        sendResendEmail(
+            $toEmail,
+            "Emergency Contact",
+            "🚨 Emergency Alert - FlexiRide",
+            $emailBody
+        );
 
-        $mail->isHTML(true);
-        $mail->Subject = 'Emergency Alert: Location Details';
-        $mail->Body    = "
-            <h1>Emergency Alert</h1>
-            <p>A user has triggered an emergency alert. Here are the location details:</p>
-            <ul>
-                <li><strong>Latitude:</strong> $latitude</li>
-                <li><strong>Longitude:</strong> $longitude</li>
-                <li><a href='https://www.google.com/maps?q=$latitude,$longitude' target='_blank'>View on Google Maps</a></li>
-            </ul>
-        ";
-
-        $mail->send();
-        
     } catch (Exception $e) {
-        echo "Error sending email: {$mail->ErrorInfo}";
+
+        error_log("Resend Error: " . $e->getMessage());
+
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
