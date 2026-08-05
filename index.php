@@ -233,21 +233,6 @@ include_once __DIR__ . '/includes/db.php';
             </div>
             <p style="font-size:14px; color:var(--text-muted); line-height:1.5;">"The instant UPI QR code payment and PDF receipts make daily pooling super convenient and hassle-free."</p>
         </div>
-    </div>
-
-    <!-- Commuter Support & Feedback Banner -->
-    <div style="max-width:1000px; margin:40px auto 0; padding:25px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:20px; text-align:center;">
-        <h3 style="font-size:20px; color:var(--text-color); margin-bottom:8px;">💬 Have Questions or Want to Share Your Feedback?</h3>
-        <p style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">We'd love to assist you with your rides or hear about your experience on FlexiRide!</p>
-        <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:15px;">
-            <a href="queries.php" style="padding:12px 24px; background:var(--input-bg); border:1px solid var(--primary-color); border-radius:12px; text-decoration:none; color:var(--primary-color); font-weight:700; display:inline-flex; align-items:center; gap:8px;">
-                <i class='bx bxs-message-square-detail'></i> ❓ Submit a Support Query
-            </a>
-            <a href="feedback.php" style="padding:12px 24px; background:var(--input-bg); border:1px solid var(--success-color); border-radius:12px; text-decoration:none; color:var(--success-color); font-weight:700; display:inline-flex; align-items:center; gap:8px;">
-                <i class='bx bxs-star'></i> ⭐ Submit Platform Feedback
-            </a>
-        </div>
-    </div>
 </section>
 
 <?php if (isset($_SESSION['user_id'])): ?>
@@ -329,5 +314,6 @@ include_once __DIR__ . '/includes/db.php';
         }, { enableHighAccuracy: true });
     }
 </script>
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

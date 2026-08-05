@@ -51,26 +51,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // ⏳ Interactive Form Submit Loader Interceptor
     document.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', function(e) {
+            if (form.id === 'searchForm') return; // Handled dynamically via AJAX in find_ride.php
             const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-            if (submitBtn && !submitBtn.disabled) {
+            if (submitBtn && submitBtn.style.pointerEvents !== 'none') {
                 if (!navigator.onLine) {
                     e.preventDefault();
                     alert('⚠️ Cannot submit form while offline! Please reconnect to the internet.');
                     return false;
                 }
-                const originalText = submitBtn.innerHTML || submitBtn.value;
-                submitBtn.disabled = true;
+                submitBtn.style.pointerEvents = 'none';
                 submitBtn.style.opacity = '0.85';
                 submitBtn.style.cursor = 'wait';
                 submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px; vertical-align:middle; margin-right:6px;'></i> Processing request...`;
-                
-                // Allow form to submit normally
-                setTimeout(() => {
-                    if (form.getAttribute('action') !== '#' && !e.defaultPrevented) {
-                        form.submit();
-                    }
-                }, 100);
             }
         });
     });
+
+    // 📱 Register PWA Service Worker for Offline Capability & Push Notifications
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Registration fallback:', err));
+    }
 });

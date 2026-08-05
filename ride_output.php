@@ -20,7 +20,10 @@ $helmet_provided   = $_SESSION['helmet_provided'] ?? 1;
 $gender_preference = $_SESSION['gender_preference'] ?? 'any';
 $vehicle_model     = $_SESSION['vehicle_model'] ?? 'Bike';
 $luggage_limit     = $_SESSION['luggage_limit'] ?? 'Backpack only';
-$distance_km       = $_SESSION['route_distance'] ?? 25.0;
+$distance_km       = (float)($_SESSION['route_distance'] ?? 25.0);
+$via_route_name    = $_SESSION['via_route_name'] ?? '';
+
+$error = "";
 
 // Win-Win Dynamic Pricing Calculations
 if ($vehicle_category === 'bike') {
@@ -38,19 +41,25 @@ if ($suggested_fare < 20) $suggested_fare = 20.0; // minimum floor fare
 
 // Handle Post Confirmation
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_post'])) {
-    $final_price = (float)$_POST['final_price'];
+    $final_price = (float)($_POST['final_price'] ?? $suggested_fare);
 
+    safeAddColumn($conn, 'rides', 'via_route_name', "VARCHAR(255) NULL");
     safeAddColumn($conn, 'rides', 'route_distance', "DECIMAL(8,2) NOT NULL DEFAULT 25.00");
     safeAddColumn($conn, 'rides', 'trip_status', "VARCHAR(50) NOT NULL DEFAULT 'active'");
-    $stmt = $conn->prepare("INSERT INTO rides (user_id, origin, destination, ride_date, ride_time, vehicle_type, vehicle_category, vehicle_model, seats_available, price, helmet_provided, gender_preference, luggage_limit, route_distance, trip_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')");
     
-    $stmt->bind_param("isssssssidsssd", $user_id, $origin, $destination, $ride_date, $ride_time, $vehicle_category, $vehicle_category, $vehicle_model, $seats_available, $final_price, $helmet_provided, $gender_preference, $luggage_limit, $distance_km);
+    $stmt = $conn->prepare("INSERT INTO rides (user_id, origin, destination, via_route_name, ride_date, ride_time, vehicle_type, vehicle_category, vehicle_model, seats_available, price, helmet_provided, gender_preference, luggage_limit, route_distance, trip_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')");
+    
+    if ($stmt) {
+        $stmt->bind_param("issssssssidissd", $user_id, $origin, $destination, $via_route_name, $ride_date, $ride_time, $vehicle_category, $vehicle_category, $vehicle_model, $seats_available, $final_price, $helmet_provided, $gender_preference, $luggage_limit, $distance_km);
 
-    if ($stmt->execute()) {
-        header("Location: myrides.php");
-        exit();
+        if ($stmt->execute()) {
+            header("Location: myrides.php");
+            exit();
+        } else {
+            $error = "Error saving ride to database: " . $stmt->error;
+        }
     } else {
-        $error = "Error saving ride: " . $conn->error;
+        $error = "Database statement prepare failed: " . $conn->error;
     }
 }
 
@@ -123,6 +132,12 @@ $waShareUrl = "https://api.whatsapp.com/send?text=" . urlencode($waText);
 <div class="container">
     <div class="card">
         <h2>⚡ Win-Win Fare Calculation & Route Confirmation</h2>
+
+        <?php if (!empty($error)): ?>
+            <div style="background:var(--danger-bg); color:var(--danger-color); border:1px solid var(--danger-color); padding:12px; border-radius:10px; margin-bottom:20px; text-align:center; font-weight:600; font-size:14px;">
+                <?php echo htmlspecialchars($error); ?>
+            </div>
+        <?php endif; ?>
 
         <div class="fare-badge">
             <label style="font-size:14px; color:var(--text-muted); display:block;">Suggested Win-Win Fair Fare (Per Seat)</label>

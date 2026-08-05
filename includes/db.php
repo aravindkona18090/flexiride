@@ -14,22 +14,19 @@ if ($conn->connect_error) {
 
 $conn->set_charset("utf8mb4");
 
-// Helper to safely add column if missing
+// Reliable Column Guarantee Helper
 function safeAddColumn($conn, $table, $column, $definition) {
     $check = $conn->query("SHOW COLUMNS FROM `$table` LIKE '$column'");
     if ($check && $check->num_rows == 0) {
-        $conn->query("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
+        @$conn->query("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
     }
 }
 
-// Ensure 3NF relational tables and missing columns exist
-safeAddColumn($conn, 'users', 'profile_photo', "VARCHAR(255) NULL");
-safeAddColumn($conn, 'vehicles', 'total_seats', "INT NOT NULL DEFAULT 5");
-safeAddColumn($conn, 'rides', 'route_distance', "DECIMAL(8,2) NOT NULL DEFAULT 25.00");
-safeAddColumn($conn, 'rides', 'trip_status', "VARCHAR(50) NOT NULL DEFAULT 'active'");
-// Dynamic Real-Time Status Engine: Auto-mark passed rides & bookings as 'Completed'
-$conn->query("UPDATE bookings b JOIN rides r ON b.ride_id = r.id SET b.trip_status = 'Completed' WHERE b.trip_status IN ('Confirmed', 'OnTheWay') AND CONCAT(r.ride_date, ' ', r.ride_time) < NOW()");
-$conn->query("UPDATE rides SET trip_status = 'Completed' WHERE (trip_status IS NULL OR trip_status = '' OR trip_status = 'active') AND CONCAT(ride_date, ' ', ride_time) < NOW()");
+// Perform lightweight periodic ride status update (10% sampling to prevent database locking)
+if (rand(1, 100) <= 10) {
+    @$conn->query("UPDATE bookings b JOIN rides r ON b.ride_id = r.id SET b.trip_status = 'Completed' WHERE b.trip_status IN ('Confirmed', 'OnTheWay') AND CONCAT(r.ride_date, ' ', r.ride_time) < NOW()");
+    @$conn->query("UPDATE rides SET trip_status = 'Completed' WHERE (trip_status IS NULL OR trip_status = '' OR trip_status = 'active') AND CONCAT(ride_date, ' ', ride_time) < NOW()");
+}
 
 // 3NF Relation Sync Helper
 function syncUser3NF($conn, $user_id, $aadhaar, $is_aadhaar, $dl, $is_dl, $college, $is_college, $campus, $upi, $is_upi, $is_verified, $em1, $em2, $em_phone) {

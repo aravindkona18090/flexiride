@@ -80,36 +80,58 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $email    = trim($_POST['email']);
         $password = $_POST['password'];
 
-        $adminEmail = getenv('ADMIN_EMAIL') ?: 'admin@flexiride.com';
-        $adminPass  = getenv('ADMIN_PASS')  ?: 'Admin@123';
+        // Security Throttling & Brute-Force Protection Rate Limiter
+        $failedAttempts  = $_SESSION['login_failed_count'] ?? 0;
+        $lastAttemptTime = $_SESSION['last_login_attempt'] ?? 0;
 
-        // Check if log in is for Admin Dashboard
-        if ($email === $adminEmail && $password === $adminPass) {
-            $_SESSION['is_admin'] = true;
-            $_SESSION['user_id']  = 9999;
-            $_SESSION['name']     = 'System Admin';
-            header("Location: admin/admin_dashboard.php");
-            exit();
-        }
-
-        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc();
-
-        if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['name']    = $user['name'];
-            
-            // Check if user account has admin privileges
-            if (($user['email'] ?? '') === $adminEmail) {
-                $_SESSION['is_admin'] = true;
-            }
-            
-            header("Location: index.php");
-            exit();
+        if ($failedAttempts >= 5 && (time() - $lastAttemptTime) < 900) {
+            $remainingMins = ceil((900 - (time() - $lastAttemptTime)) / 60);
+            $error = "🔒 Security Lockout: Too many failed login attempts! Try again in {$remainingMins} minutes.";
         } else {
-            $error = "Invalid Email or Password!";
+            if ($failedAttempts >= 5 && (time() - $lastAttemptTime) >= 900) {
+                $_SESSION['login_failed_count'] = 0;
+            }
+
+            $adminEmail = getenv('ADMIN_EMAIL') ?: 'admin@flexiride.com';
+            $adminPass  = getenv('ADMIN_PASS')  ?: 'Admin@123';
+
+            // Check if log in is for Admin Dashboard
+            if ($email === $adminEmail && $password === $adminPass) {
+                $_SESSION['login_failed_count'] = 0;
+                $_SESSION['is_admin'] = true;
+                $_SESSION['user_id']  = 9999;
+                $_SESSION['name']     = 'System Admin';
+                header("Location: admin/admin_dashboard.php");
+                exit();
+            }
+
+            $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $user = $stmt->get_result()->fetch_assoc();
+
+            if ($user && password_verify($password, $user['password'])) {
+                $_SESSION['login_failed_count'] = 0;
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['name']    = $user['name'];
+                
+                // Check if user account has admin privileges
+                if (($user['email'] ?? '') === $adminEmail) {
+                    $_SESSION['is_admin'] = true;
+                }
+                
+                header("Location: index.php");
+                exit();
+            } else {
+                $_SESSION['login_failed_count'] = ($failedAttempts + 1);
+                $_SESSION['last_login_attempt'] = time();
+                $attemptsLeft = 5 - $_SESSION['login_failed_count'];
+                if ($attemptsLeft > 0) {
+                    $error = "Invalid Email or Password! ({$attemptsLeft} attempt(s) remaining before temporary lockout)";
+                } else {
+                    $error = "🔒 Account locked for 15 minutes due to 5 consecutive failed login attempts.";
+                }
+            }
         }
     }
 }
