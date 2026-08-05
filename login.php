@@ -187,7 +187,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <!-- OTP Verification Step -->
         <?php if ($showOtpStep): ?>
-            <form method="POST">
+            <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot verify while offline!'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> ⏳ Verifying OTP...`;">
                 <input type="hidden" name="action" value="verify_otp">
                 <div style="text-align:center; margin-bottom:20px;">
                     <i class='bx bxs-envelope-open' style="font-size:48px; color:var(--primary-color);"></i>
@@ -204,7 +204,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </form>
         <?php else: ?>
             <!-- Login Form -->
-            <form method="POST" id="form-login">
+            <form method="POST" id="form-login" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot login while offline!'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> ⏳ Authenticating...`;">
                 <input type="hidden" name="action" value="login">
                 <div class="form-group">
                     <label>Email Address</label>
@@ -218,7 +218,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </form>
 
             <!-- Register & Request OTP Form -->
-            <form method="POST" id="form-register" style="display:none;">
+            <form method="POST" id="form-register" style="display:none;" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot send OTP while offline!'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> ⏳ Dispatching 6-digit OTP...`;">
                 <input type="hidden" name="action" value="send_otp">
                 <div class="form-group">
                     <label>Full Name</label>

@@ -93,7 +93,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
+        .container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            width: 100%;
+        }
         .card {
             background: var(--card-bg);
             backdrop-filter: blur(12px);
@@ -117,34 +125,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="card">
-    <div style="text-align: center;">
-        <span class="tag">🏍️ <?php echo strtoupper($ride['vehicle_category'] ?? 'BIKE'); ?> RIDE</span>
-    </div>
-    <h2>Book Your Seat</h2>
-
-    <?php if ($errorMessage): ?>
-        <div class="alert-error"><?php echo htmlspecialchars($errorMessage); ?></div>
-    <?php endif; ?>
-
-    <div class="info-box">
-        <p><strong>Driver:</strong> <?php echo htmlspecialchars($ride['driver_name']); ?></p>
-        <p><strong>Route:</strong> <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></p>
-        <p><strong>Date & Time:</strong> <?php echo htmlspecialchars($ride['ride_date']); ?> at <?php echo htmlspecialchars($ride['ride_time']); ?></p>
-        <p><strong>Vehicle:</strong> <?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_type']); ?></p>
-        <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
-            <p><strong>Spare Helmet:</strong> <?php echo ($ride['helmet_provided'] ?? 1) ? '🪖 Provided' : 'Bring Own'; ?></p>
-        <?php endif; ?>
-        <p><strong>Price per Seat:</strong> <span style="color:var(--success-color); font-weight:700; font-size:18px;">₹<?php echo htmlspecialchars($ride['price']); ?></span></p>
-    </div>
-
-    <form method="POST">
-        <div style="margin-bottom: 20px;">
-            <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select Seats to Book</label>
-            <input type="number" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" style="width:100%; padding:14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:16px; outline:none;" required>
+<div class="container">
+    <div class="card">
+        <div style="text-align: center;">
+            <span class="tag">🏍️ <?php echo strtoupper($ride['vehicle_category'] ?? 'BIKE'); ?> RIDE</span>
         </div>
-        <button type="submit" class="btn-confirm">Confirm Seat Booking Now</button>
-    </form>
+        <h2>Book Your Seat</h2>
+
+        <?php if ($errorMessage): ?>
+            <div class="alert-error"><?php echo htmlspecialchars($errorMessage); ?></div>
+        <?php endif; ?>
+
+        <div class="info-box">
+            <p><strong>Driver:</strong> <?php echo htmlspecialchars($ride['driver_name']); ?></p>
+            <p><strong>Route:</strong> <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></p>
+            <p><strong>Date & Time:</strong> <?php echo htmlspecialchars($ride['ride_date']); ?> at <?php echo htmlspecialchars($ride['ride_time']); ?></p>
+            <p><strong>Vehicle:</strong> <?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_type']); ?></p>
+            <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
+                <p><strong>Spare Helmet:</strong> <?php echo ($ride['helmet_provided'] ?? 1) ? '🪖 Provided' : 'Bring Own'; ?></p>
+            <?php endif; ?>
+            <p><strong>Price per Seat:</strong> <span style="color:var(--success-color); font-weight:700; font-size:18px;">₹<?php echo htmlspecialchars($ride['price']); ?></span></p>
+        </div>
+
+        <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot book while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Securing seat & notifying driver...`;">
+            <div style="margin-bottom: 20px;">
+                <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select Seats to Book</label>
+                <input type="number" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" style="width:100%; padding:14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:16px; outline:none;" required>
+            </div>
+            <button type="submit" class="btn-confirm">Confirm Seat Booking Now</button>
+        </form>
+    </div>
 </div>
 
 </body>

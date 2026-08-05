@@ -194,7 +194,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
-        <form method="POST" id="postRideForm">
+        <form method="POST" id="postRideForm" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot calculate fare while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Calculating fuel share fare & generating route...`;">
             <input type="hidden" name="route_distance" id="route_distance" value="25.0">
             <input type="hidden" name="via_route_name" id="via_route_name" value="">
 
