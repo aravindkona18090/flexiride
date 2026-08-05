@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
@@ -204,7 +204,7 @@ $vehicles = $vehiclesStmt->get_result();
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="container">
     <?php if ($successMsg): ?>
@@ -233,6 +233,11 @@ $vehicles = $vehiclesStmt->get_result();
             <h2><?php echo htmlspecialchars($user['name'] ?? 'User'); ?></h2>
             <p style="color:var(--text-muted); font-size:15px;"><?php echo htmlspecialchars($user['email'] ?? ''); ?> | <?php echo htmlspecialchars($user['phone'] ?? ''); ?></p>
             <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+                <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
+                    <span class="badge-verified" style="background:rgba(239,68,68,0.2); color:#ef4444; border-color:#ef4444;">
+                        <i class='bx bxs-shield-quarter'></i> 🛡️ System Administrator
+                    </span>
+                <?php endif; ?>
                 <?php if ($user['is_aadhaar_verified'] ?? 0): ?>
                     <span class="badge-verified"><i class='bx bxs-shield-quarter'></i> 🛡️ Aadhaar Verified Rider</span>
                 <?php endif; ?>
@@ -252,8 +257,13 @@ $vehicles = $vehiclesStmt->get_result();
                     </span>
                 <?php endif; ?>
             </div>
-            <div>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
                 <a href="edit_profile.php" class="btn-edit-profile"><i class='bx bxs-edit'></i> Edit Profile Details</a>
+                <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
+                    <a href='admin/admin_dashboard.php' class="btn-edit-profile" style="background:linear-gradient(135deg, #ef4444, #dc2626);">
+                        <i class='bx bxs-dashboard'></i> Admin Control Panel →
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -383,6 +393,24 @@ $vehicles = $vehiclesStmt->get_result();
             <div class="info-item"><label>Emergency Contact 1</label><span><?php echo htmlspecialchars($user['emergency_email1'] ?? 'None'); ?></span></div>
             <div class="info-item"><label>Emergency Contact 2</label><span><?php echo htmlspecialchars($user['emergency_email2'] ?? 'None'); ?></span></div>
             <div class="info-item"><label>Emergency Phone</label><span><?php echo htmlspecialchars($user['emergency_phone'] ?? 'None'); ?></span></div>
+        </div>
+    </div>
+
+    <!-- Commuter Support & Feedback Center Section -->
+    <div class="section-card" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(129, 140, 248, 0.08) 100%); border-color: rgba(56, 189, 248, 0.3);">
+        <div class="section-title">
+            <span><i class='bx bxs-help-circle' style="color:var(--primary-color);"></i> 💬 Commuter Support & Platform Feedback</span>
+        </div>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:18px;">Have a question about your rides, need help, or want to share your commute experience with us?</p>
+        <div style="display:flex; flex-wrap:wrap; gap:15px;">
+            <a href="queries.php" style="flex:1; min-width:220px; padding:14px 20px; background:var(--input-bg); border:1px solid var(--primary-color); border-radius:14px; text-decoration:none; color:var(--text-color); font-weight:700; display:flex; align-items:center; justify-content:space-between;">
+                <span><i class='bx bxs-message-square-detail' style="color:var(--primary-color); font-size:20px; vertical-align:middle; margin-right:6px;"></i> ❓ Submit Support Query</span>
+                <span style="color:var(--primary-color);">→</span>
+            </a>
+            <a href="feedback.php" style="flex:1; min-width:220px; padding:14px 20px; background:var(--input-bg); border:1px solid var(--success-color); border-radius:14px; text-decoration:none; color:var(--text-color); font-weight:700; display:flex; align-items:center; justify-content:space-between;">
+                <span><i class='bx bxs-star' style="color:var(--success-color); font-size:20px; vertical-align:middle; margin-right:6px;"></i> ⭐ Submit Platform Feedback</span>
+                <span style="color:var(--success-color);">→</span>
+            </a>
         </div>
     </div>
 </div>

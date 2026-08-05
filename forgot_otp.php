@@ -1,5 +1,5 @@
 <?php
-include "db.php";
+include_once __DIR__ . '/includes/db.php';
 session_start();
 $completed = False;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

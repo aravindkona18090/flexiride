@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
 
 $rides = [];
@@ -120,7 +120,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="container">
     <div class="search-card">
@@ -189,10 +189,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $('#searchForm').submit();
     }
 
+    const mapTilerKey = 'fMfeiTRB4wmIuS13BrCk';
     const map = L.map('map').setView([13.6288, 79.4192], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+
+    const maptilerStreets = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`, {
+        tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 20,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+    });
+
+    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri World Imagery'
+    });
+
+    const maptilerSatellite = L.tileLayer(`https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${mapTilerKey}`, {
+        tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 20,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a>'
+    });
+
+    const maptilerDark = L.tileLayer(`https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.png?key=${mapTilerKey}`, {
+        tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 20,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a>'
+    });
+
+    maptilerStreets.addTo(map);
+
+    L.control.layers({
+        "🏙️ MapTiler Streets": maptilerStreets,
+        "🛰️ Satellite Hybrid": maptilerSatellite,
+        "🌍 Satellite HD (Esri)": esriSatellite,
+        "🌑 Dataviz Dark": maptilerDark
     }).addTo(map);
+
+    // Auto-detect user's live GPS current location with high street precision
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+            map.setView([userLat, userLng], 15);
+
+            L.circle([userLat, userLng], {
+                color: '#0284c7',
+                fillColor: '#38bdf8',
+                fillOpacity: 0.8,
+                radius: 10
+            }).addTo(map);
+
+            L.marker([userLat, userLng]).addTo(map).bindPopup('📍 You Are Here').openPopup();
+        }, function(error) {
+            console.log("GPS Location permission fallback:", error);
+        }, { enableHighAccuracy: true });
+    }
 
     let originMarker = null;
     let destMarker = null;

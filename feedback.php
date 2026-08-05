@@ -1,230 +1,128 @@
 <?php
 session_start();
-include 'db.php';
-require 'resend.php';
+include_once __DIR__ . '/includes/db.php';
+
+$name = "";
+$email = "";
+$successMsg = "";
+$errorMsg = "";
+
+// Auto-fill logged in user info
+if (isset($_SESSION['user_id'])) {
+    $u_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+    $u_stmt->bind_param("i", $_SESSION['user_id']);
+    $u_stmt->execute();
+    $u_res = $u_stmt->get_result()->fetch_assoc();
+    if ($u_res) {
+        $name = $u_res['name'];
+        $email = $u_res['email'];
+    }
+}
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-
     $name = trim($_POST["name"]);
     $email = trim($_POST["email"]);
     $feedback = trim($_POST["Feedback"]);
 
-    $sql = "INSERT INTO feedback(name, email, feedback)
-            VALUES('$name', '$email', '$feedback')";
-
-    if ($conn->query($sql) === TRUE) {
-
-        $emailBody = "
-        <h2>New Feedback Received</h2>
-
-        <p><strong>Name:</strong> {$name}</p>
-
-        <p><strong>Email:</strong> {$email}</p>
-
-        <p><strong>Feedback:</strong></p>
-
-        <div style='padding:12px;border:1px solid #ddd;border-radius:6px;background:#f9f9f9;'>
-            {$feedback}
-        </div>
-
-        <br>
-
-        <p>This feedback was submitted through the <strong>FlexiRide</strong> website.</p>
-        ";
-
-        try {
-
-            sendResendEmail(
-                "feedbackflexiride@gmail.com",
-                "FlexiRide Feedback",
-                "New Feedback Received",
-                $emailBody
-            );
-
-            echo "<script>alert('Feedback submitted successfully. Thank you!');</script>";
-
-        } catch (Exception $e) {
-
-            error_log("Resend Error: " . $e->getMessage());
-
-            // Feedback is already saved in the database.
-            echo "<script>alert('Feedback saved successfully, but email notification could not be sent.');</script>";
-
+    if (!empty($name) && !empty($email) && !empty($feedback)) {
+        $stmt = $conn->prepare("INSERT INTO feedback (name, email, feedback) VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $name, $email, $feedback);
+        if ($stmt->execute()) {
+            $successMsg = "Thank you for your valuable feedback! Your thoughts help us make FlexiRide better for everyone. ⭐";
+        } else {
+            $errorMsg = "Database error: " . $conn->error;
         }
-
     } else {
-
-        echo "<script>alert('Feedback not sent');</script>";
-
+        $errorMsg = "Please complete all fields before submitting.";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Sofadi+One&display=swap" rel="stylesheet">    
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feedback Form</title>
+    <title>Submit Platform Feedback - FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
-        /* Global styles */
-        body {
-            font-family: "Josefin Sans", sans-serif;
-            background: #f4f4f9;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
+
+        .container { max-width: 650px; margin: 40px auto; padding: 0 20px; width: 100%; }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 35px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         }
 
-        
+        .card h2 { font-size: 24px; color: var(--text-color); margin-bottom: 8px; text-align: center; }
+        .card p { font-size: 14px; color: var(--text-muted); text-align: center; margin-bottom: 25px; }
 
-        /* Form container */
-        form {
-            
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 25px 35px;
-            width: 100%;
-            max-width: 500px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-            transform: scale(0.9);
-            animation: pop-in 1s ease forwards;
-            backdrop-filter: blur(10px);
-            background-color: rgba(244, 244, 244, 0.7);
-            
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: var(--text-color); margin-bottom: 8px; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--input-border);
+            background: var(--input-bg); color: var(--text-color); outline: none; font-size: 15px;
         }
 
-        @keyframes pop-in {
-            0% { transform: scale(0.7); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+        .btn-submit {
+            width: 100%; padding: 16px; border: none; border-radius: 12px;
+            background: var(--primary-gradient); color: white; font-size: 16px; font-weight: 700;
+            cursor: pointer; transition: 0.3s; display: flex; justify-content: center; align-items: center; gap: 8px;
         }
 
-        /* Labels */
-        label {
-            font-weight: bold;
-            margin-top: 10px;
-            display: block;
-            color: #333333;
-            font-family: "Josefin Sans", sans-serif;
-            font-size: large;
-            opacity: 0;
-            animation: fade-in 1.5s forwards;
-        }
-
-        @keyframes fade-in {
-            0% { opacity: 0; transform: translateY(-10px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Input fields */
-        input[type="text"], 
-        input[type="email"], 
-        textarea {
-            width: 95%;
-            padding: 12px;
-            margin-top: 5px;
-            font-size: large;
-            margin-bottom: 15px;
-            border: 1px solid #d0d0d0;
-            border-radius: 5px;
-            color: #333333;
-            transition: all 0.3s ease;
-        }
-
-        input[type="text"]:focus, 
-        input[type="email"]:focus, 
-        textarea:focus {
-            border-color: #007bff;
-            outline: none;
-            box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
-            transform: scale(1.05);
-        }
-
-        /* Textarea */
-        textarea {
-            height: 120px;
-            resize: vertical;
-        }
-
-        /* Submit button */
-        button {
-            width: 100%;
-            padding: 12px 15px;
-            background:#3498db;
-            color: #ffffff;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            animation: slide-in 1.5s ease forwards;
-            animation-delay: 1s;
-            font-family: "Josefin Sans", sans-serif;
-        }
-
-        button:hover {
-            background:linear-gradient(135deg, #6767b3, #4a4a8a);
-            transform: scale(1.1);
-            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
-        }
-
-        @keyframes slide-in {
-            0% { opacity: 0; transform: translateY(20px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Floating effect for the form */
-        form:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
-            transition: transform 0.5s ease, box-shadow 0.5s ease;
-        }
-        .back-home-btn {
-            display: inline-block;
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            padding: 10px 20px;
-            font-size: 1rem;
-            font-weight: bold;
-            color: #fff;
-            background-color: #3498db;
-            text-decoration: none;
-            border-radius: 5px;
-            text-align: center;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .back-home-btn:hover {
-            background-color: #2c3e50;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-        }
+        .alert-success { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
     </style>
 </head>
 <body>
-    <a class="back-home-btn" href="index.php">Back to home</a>
-    <form action="feedback.php" method="post">
-        <label for="name">Enter your Name:</label>
-        <input type="text" name="name" id="name" placeholder="John Doe" />
-        
-        <label for="email">Enter your Email ID:</label>
-        <input type="email" name="email" id="email" placeholder="example@mail.com" />
-        
-        <label for="Feedback">Feedback:</label>
-        <textarea name="Feedback" id="Feedback" placeholder="Write your feedback here..."></textarea>
-        
-        <button type="submit">Submit</button>
-    </form>
-    
+
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
+
+<div class="container">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <a href="index.php" style="background:var(--input-bg); color:var(--text-color); border:1px solid var(--card-border); padding:10px 18px; border-radius:12px; text-decoration:none; font-weight:600; font-size:14px; display:inline-flex; align-items:center; gap:6px;">
+            <i class='bx bx-left-arrow-alt'></i> 🏠 Back to Home
+        </a>
+    </div>
+
+    <div class="card">
+        <h2>⭐ Share Your FlexiRide Experience</h2>
+        <p>Your feedback helps us continuously improve safety, features, and comfort for all commuters!</p>
+
+        <?php if ($successMsg): ?>
+            <div class="alert-success"><?php echo htmlspecialchars($successMsg); ?></div>
+        <?php endif; ?>
+
+        <?php if ($errorMsg): ?>
+            <div class="alert-error"><?php echo htmlspecialchars($errorMsg); ?></div>
+        <?php endif; ?>
+
+        <form method="POST">
+            <div class="form-group">
+                <label>Your Name *</label>
+                <input type="text" name="name" value="<?php echo htmlspecialchars($name); ?>" placeholder="Enter your full name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Your Email Address *</label>
+                <input type="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="Enter your email" required>
+            </div>
+
+            <div class="form-group">
+                <label>Your Feedback & Suggestions *</label>
+                <textarea name="Feedback" rows="5" placeholder="Share your experience or feature suggestions..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit"><i class='bx bxs-star'></i> Submit Feedback →</button>
+        </form>
+    </div>
+</div>
 </body>
 </html>

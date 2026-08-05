@@ -1,11 +1,11 @@
 <?php
-require 'resend.php';
-require 'db.php';
+require_once __DIR__ . '/includes/resend.php';
+require_once __DIR__ . '/includes/db.php';
 session_start();
 
 // Ensure the user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login1.html");
+    header("Location: login.php");
     exit();
 }
 

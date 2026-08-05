@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
@@ -107,12 +107,25 @@ $my_rides = $stmt->get_result();
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="container">
     <div class="page-header">
         <h2>🏍️ My Offered Rides & Trips</h2>
         <a href="post_ride.php" class="btn-post">➕ Offer New Ride</a>
+    </div>
+
+    <!-- Instant Search & Status Filter Bar -->
+    <div style="background:var(--card-bg); border:1px solid var(--card-border); padding:15px 20px; border-radius:16px; margin-bottom:25px; display:flex; gap:15px; align-items:center; flex-wrap:wrap; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
+        <div style="flex:1; position:relative; min-width:220px;">
+            <i class='bx bx-search' style="position:absolute; left:14px; top:12px; color:var(--text-muted); font-size:18px;"></i>
+            <input type="text" id="tripSearch" placeholder="🔍 Instant search by city, location or date..." onkeyup="filterTrips()" style="width:100%; padding:10px 14px 10px 40px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); outline:none; font-size:14px;">
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button type="button" class="filter-btn active" onclick="setFilter('all', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--primary-color); background:var(--primary-color); color:white; font-size:13px; font-weight:600; cursor:pointer;">All Trips</button>
+            <button type="button" class="filter-btn" onclick="setFilter('active', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer;">Active</button>
+            <button type="button" class="filter-btn" onclick="setFilter('cancelled', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer;">Cancelled</button>
+        </div>
     </div>
 
     <?php if ($successMsg): ?>
@@ -196,5 +209,32 @@ $my_rides = $stmt->get_result();
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+    let currentFilter = 'all';
+    function setFilter(status, btn) {
+        currentFilter = status;
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            b.style.background = 'var(--input-bg)';
+            b.style.color = 'var(--text-muted)';
+            b.style.borderColor = 'var(--input-border)';
+        });
+        btn.style.background = 'var(--primary-color)';
+        btn.style.color = 'white';
+        btn.style.borderColor = 'var(--primary-color)';
+        filterTrips();
+    }
+
+    function filterTrips() {
+        const q = document.getElementById('tripSearch').value.toLowerCase();
+        const cards = document.querySelectorAll('.ride-card');
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            const matchesSearch = text.includes(q);
+            const matchesStatus = (currentFilter === 'all') || text.includes('status: ' + currentFilter);
+            card.style.display = (matchesSearch && matchesStatus) ? 'flex' : 'none';
+        });
+    }
+</script>
 </body>
 </html>

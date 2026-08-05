@@ -2,7 +2,11 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-include_once 'db.php';
+include_once __DIR__ . '/db.php';
+
+$isSubfolder = (basename(dirname($_SERVER['SCRIPT_NAME'])) === 'admin');
+$navRel = $isSubfolder ? '../' : '';
+$adminRel = $isSubfolder ? '' : 'admin/';
 
 // Fetch user profile photo and unread notifications if logged in
 $navProfilePhoto = '';
@@ -17,17 +21,17 @@ if (isset($_SESSION['user_id'])) {
         if ($userData) {
             $navUserName = $userData['name'];
             $navProfilePhoto = $userData['profile_photo'] ?? '';
+            if (!empty($navProfilePhoto) && !str_starts_with($navProfilePhoto, 'http') && !str_starts_with($navProfilePhoto, '/')) {
+                $navProfilePhoto = $navRel . $navProfilePhoto;
+            }
         }
     }
 }
 ?>
 
-<script src="theme.js"></script>
+<script src="<?php echo $navRel; ?>assets/js/theme.js"></script>
 
 <style>
-    /* ============================================================
-       Master Dynamic CSS Variable Design System
-       ============================================================ */
     :root, [data-theme="slate"] {
         --bg-color: #0f172a;
         --card-bg: rgba(30, 41, 59, 0.85);
@@ -50,185 +54,150 @@ if (isset($_SESSION['user_id'])) {
         --card-border: rgba(52, 211, 153, 0.25);
         --primary-color: #34d399;
         --primary-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
-        --success-color: #6ee7b7;
-        --success-bg: rgba(16, 185, 129, 0.2);
-        --danger-color: #f87171;
-        --danger-bg: rgba(239, 68, 68, 0.2);
+        --success-color: #34d399;
         --text-color: #ecfdf5;
-        --text-muted: #a7f3d0;
-        --input-bg: #042116;
-        --input-border: #065f46;
+        --text-muted: #6ee7b7;
+        --input-bg: #062c1e;
+        --input-border: #047857;
     }
 
     [data-theme="cyberpunk"] {
-        --bg-color: #120326;
-        --card-bg: rgba(34, 9, 66, 0.88);
-        --card-border: rgba(217, 70, 239, 0.25);
-        --primary-color: #e879f9;
-        --primary-gradient: linear-gradient(135deg, #c026d3 0%, #9333ea 100%);
-        --success-color: #22d3ee;
-        --success-bg: rgba(6, 182, 212, 0.2);
-        --danger-color: #f43f5e;
-        --danger-bg: rgba(244, 63, 94, 0.2);
-        --text-color: #fae8ff;
-        --text-muted: #d8b4fe;
-        --input-bg: #1c053a;
+        --bg-color: #180b28;
+        --card-bg: rgba(39, 17, 63, 0.88);
+        --card-border: rgba(236, 72, 153, 0.3);
+        --primary-color: #f472b6;
+        --primary-gradient: linear-gradient(135deg, #c084fc 0%, #db2777 100%);
+        --success-color: #a855f7;
+        --text-color: #fdf4ff;
+        --text-muted: #e879f9;
+        --input-bg: #180b28;
         --input-border: #7e22ce;
     }
 
     [data-theme="royal"] {
-        --bg-color: #f0f9ff;
+        --bg-color: #f8fafc;
         --card-bg: #ffffff;
-        --card-border: #bae6fd;
+        --card-border: #e2e8f0;
         --primary-color: #0284c7;
         --primary-gradient: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
         --success-color: #16a34a;
-        --success-bg: #dcfce7;
-        --danger-color: #dc2626;
-        --danger-bg: #fee2e2;
         --text-color: #0f172a;
-        --text-muted: #475569;
-        --input-bg: #f8fafc;
+        --text-muted: #64748b;
+        --input-bg: #f1f5f9;
         --input-border: #cbd5e1;
     }
 
     [data-theme="amber"] {
-        --bg-color: #fffbeb;
-        --card-bg: #ffffff;
-        --card-border: #fde68a;
-        --primary-color: #d97706;
-        --primary-gradient: linear-gradient(135deg, #d97706 0%, #ea580c 100%);
-        --success-color: #15803d;
-        --success-bg: #dcfce7;
-        --danger-color: #b91c1c;
-        --danger-bg: #fee2e2;
-        --text-color: #1e1b4b;
-        --text-muted: #6b7280;
-        --input-bg: #fffbf0;
-        --input-border: #fcd34d;
-    }
-
-    body {
-        background-color: var(--bg-color) !important;
-        color: var(--text-color) !important;
-        transition: background-color 0.3s ease, color 0.3s ease;
+        --bg-color: #1c1917;
+        --card-bg: rgba(44, 36, 32, 0.88);
+        --card-border: rgba(245, 158, 11, 0.3);
+        --primary-color: #fbbf24;
+        --primary-gradient: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+        --success-color: #10b981;
+        --text-color: #fffbeb;
+        --text-muted: #fde68a;
+        --input-bg: #1c1917;
+        --input-border: #78350f;
     }
 
     .navbar {
-        width: 100%;
-        box-sizing: border-box;
         background: var(--card-bg);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(16px);
         border-bottom: 1px solid var(--card-border);
-        padding: 15px 30px;
+        padding: 14px 30px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         position: sticky;
         top: 0;
         z-index: 1000;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        transition: background 0.3s ease, border-color 0.3s ease;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
-
     .logo {
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 800;
-        color: var(--text-color);
         text-decoration: none;
         display: flex;
         align-items: center;
         gap: 10px;
-        transition: color 0.3s ease;
+        letter-spacing: -0.5px;
     }
     .logo-badge {
         background: var(--primary-gradient);
         color: white;
-        padding: 6px 10px;
+        padding: 4px 10px;
         border-radius: 10px;
-        font-size: 20px;
+        font-size: 14px;
+        font-weight: 800;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-    }
-    .logo:hover .logo-badge {
-        transform: rotate(15deg) scale(1.08);
     }
     .logo-text {
         color: var(--text-color);
         font-weight: 800;
         letter-spacing: -0.5px;
-        transition: color 0.3s ease;
     }
     .logo-text span {
         color: var(--primary-color);
-        transition: color 0.3s ease;
     }
-    
     .nav-links {
         display: flex;
-        align-items: center;
-        gap: 15px;
+        gap: 22px;
         list-style: none;
+        align-items: center;
     }
     .nav-links a {
         color: var(--text-muted);
         text-decoration: none;
-        font-weight: 500;
         font-size: 15px;
-        transition: 0.3s;
-    }
-    .nav-links a:hover { color: var(--primary-color); }
-    
-    .theme-selector {
-        background: var(--input-bg);
-        color: var(--text-color);
-        border: 1px solid var(--input-border);
-        padding: 6px 10px;
-        border-radius: 8px;
-        font-size: 13px;
-        outline: none;
-        cursor: pointer;
+        font-weight: 600;
         transition: all 0.3s ease;
+        padding: 6px 12px;
+        border-radius: 8px;
+    }
+    .nav-links a:hover {
+        color: var(--primary-color);
+        background: rgba(56, 189, 248, 0.1);
     }
     .btn-login {
         background: var(--primary-gradient);
         color: white !important;
-        padding: 8px 16px;
+        padding: 8px 18px !important;
         border-radius: 10px;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    }
+    .theme-selector {
+        background: var(--input-bg);
+        color: var(--text-color);
+        border: 1px solid var(--input-border);
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-size: 13px;
         font-weight: 600;
+        outline: none;
+        cursor: pointer;
     }
-
-    /* Profile Avatar & Dropdown Container */
-    .profile-dropdown-wrapper {
-        position: relative;
-        display: inline-block;
-    }
+    .profile-dropdown-wrapper { position: relative; }
     .profile-avatar-btn {
-        background: transparent;
+        background: none;
         border: none;
         cursor: pointer;
+        padding: 0;
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 2px;
-        border-radius: 50%;
-        outline: none;
     }
     .nav-avatar-img {
-        width: 38px;
-        height: 38px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         object-fit: cover;
         border: 2px solid var(--primary-color);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
     .nav-avatar-fallback {
-        width: 38px;
-        height: 38px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         background: var(--primary-gradient);
         color: white;
@@ -236,34 +205,29 @@ if (isset($_SESSION['user_id'])) {
         align-items: center;
         justify-content: center;
         font-size: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
-
     .profile-menu-dropdown {
         display: none;
         position: absolute;
         right: 0;
-        top: 48px;
+        top: 50px;
         background: var(--card-bg);
-        backdrop-filter: blur(16px);
+        backdrop-filter: blur(20px);
         border: 1px solid var(--card-border);
         border-radius: 16px;
-        padding: 10px 0;
-        width: 210px;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-        z-index: 2000;
+        padding: 12px 0;
+        min-width: 220px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        z-index: 1001;
+        animation: fadeIn 0.2s ease-in-out;
     }
-    .profile-menu-dropdown.show {
-        display: block;
-        animation: fadeIn 0.2s ease-out;
-    }
+    .profile-menu-dropdown.show { display: block; }
     .dropdown-header-name {
-        padding: 10px 16px;
+        padding: 8px 16px 12px 16px;
+        border-bottom: 1px solid var(--card-border);
         font-size: 14px;
         font-weight: 700;
         color: var(--text-color);
-        border-bottom: 1px solid var(--card-border);
-        margin-bottom: 5px;
     }
     .dropdown-item-link {
         display: flex;
@@ -293,7 +257,7 @@ if (isset($_SESSION['user_id'])) {
 </style>
 
 <nav class="navbar">
-    <a href="index.php" class="logo">
+    <a href="<?php echo $navRel; ?>index.php" class="logo">
         <span class="logo-badge"><i class='bx bxs-bolt'></i></span>
         <span class="logo-text">Flexi<span>Ride</span></span>
     </a>
@@ -301,9 +265,17 @@ if (isset($_SESSION['user_id'])) {
     <button class="mobile-btn" onclick="toggleMobileMenu()"><i class='bx bx-menu'></i></button>
 
     <ul class="nav-links" id="navLinks">
-        <li><a href="index.php">🏠 Home</a></li>
-        <li><a href="find_ride.php">Find Ride</a></li>
-        <li><a href="post_ride.php">Offer Ride</a></li>
+        <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
+            <li><a href="<?php echo $adminRel; ?>admin_dashboard.php">🛡️ Admin Dashboard</a></li>
+            <li><a href="<?php echo $adminRel; ?>admin_manage_users.php">👥 Users</a></li>
+            <li><a href="<?php echo $adminRel; ?>admin_verify_docs.php">📋 Document Queue</a></li>
+            <li><a href="<?php echo $adminRel; ?>admin_broadcast.php">📢 Broadcast</a></li>
+            <li><a href="<?php echo $adminRel; ?>admin_sos_logs.php">🚨 SOS Logs</a></li>
+        <?php else: ?>
+            <li><a href="<?php echo $navRel; ?>index.php">🏠 Home</a></li>
+            <li><a href="<?php echo $navRel; ?>find_ride.php">Find Ride</a></li>
+            <li><a href="<?php echo $navRel; ?>post_ride.php">Offer Ride</a></li>
+        <?php endif; ?>
 
         <?php if (isset($_SESSION['user_id'])): ?>
             <li>
@@ -316,7 +288,6 @@ if (isset($_SESSION['user_id'])) {
                 </select>
             </li>
 
-            <!-- Dynamic Profile Photo / Icon Dropdown -->
             <li class="profile-dropdown-wrapper">
                 <button type="button" class="profile-avatar-btn" onclick="toggleProfileMenu(event)">
                     <?php if (!empty($navProfilePhoto)): ?>
@@ -328,12 +299,17 @@ if (isset($_SESSION['user_id'])) {
 
                 <div class="profile-menu-dropdown" id="profileMenu">
                     <div class="dropdown-header-name">Hi, <?php echo htmlspecialchars($navUserName); ?> 👋</div>
-                    <a href="profile.php" class="dropdown-item-link"><i class='bx bxs-user-detail' style="color:var(--primary-color);"></i> My Profile</a>
-                    <a href="myrides.php" class="dropdown-item-link"><i class='bx bxs-notepad' style="color:var(--success-color);"></i> My Offered Rides</a>
-                    <a href="my_booked_rides.php" class="dropdown-item-link"><i class='bx bxs-receipt' style="color:#818cf8;"></i> My Booked Trips</a>
-                    <a href="notifications.php" class="dropdown-item-link"><i class='bx bxs-bell' style="color:#f59e0b;"></i> Activity & Alerts</a>
+                    <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
+                        <a href="<?php echo $adminRel; ?>admin_dashboard.php" class="dropdown-item-link" style="color:var(--primary-color) !important; font-weight:700;"><i class='bx bxs-shield-quarter' style="color:var(--primary-color);"></i> 🛡️ Admin Dashboard</a>
+                        <a href="<?php echo $adminRel; ?>admin_manage_users.php" class="dropdown-item-link"><i class='bx bxs-user-account' style="color:var(--success-color);"></i> 👥 Manage Users</a>
+                        <div style="border-top:1px solid var(--card-border); margin:5px 0;"></div>
+                    <?php endif; ?>
+                    <a href="<?php echo $navRel; ?>profile.php" class="dropdown-item-link"><i class='bx bxs-user-detail' style="color:var(--primary-color);"></i> My Profile</a>
+                    <a href="<?php echo $navRel; ?>myrides.php" class="dropdown-item-link"><i class='bx bxs-notepad' style="color:var(--success-color);"></i> My Offered Rides</a>
+                    <a href="<?php echo $navRel; ?>my_booked_rides.php" class="dropdown-item-link"><i class='bx bxs-receipt' style="color:#818cf8;"></i> My Booked Trips</a>
+                    <a href="<?php echo $navRel; ?>notifications.php" class="dropdown-item-link"><i class='bx bxs-bell' style="color:#f59e0b;"></i> Activity & Alerts</a>
                     <div style="border-top:1px solid var(--card-border); margin:5px 0;"></div>
-                    <a href="logout.php" class="dropdown-item-link" style="color:var(--danger-color) !important;"><i class='bx bx-log-out'></i> Logout</a>
+                    <a href="<?php echo $navRel; ?>logout.php" class="dropdown-item-link" style="color:var(--danger-color) !important;"><i class='bx bx-log-out'></i> Logout</a>
                 </div>
             </li>
         <?php else: ?>
@@ -346,7 +322,7 @@ if (isset($_SESSION['user_id'])) {
                     <option value="amber">🌅 Sunset Amber</option>
                 </select>
             </li>
-            <li><a href="login.php" class="btn-login">Login / Register</a></li>
+            <li><a href="<?php echo $navRel; ?>login.php" class="btn-login">Login / Register</a></li>
         <?php endif; ?>
     </ul>
 </nav>
