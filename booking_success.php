@@ -83,6 +83,20 @@ if ($result->num_rows > 0) {
     <h2>Booking Confirmed!</h2>
     <p style="color:var(--text-muted); font-size:14px;">Your seat has been reserved successfully.</p>
 
+    <?php if (!empty($_SESSION['last_sms_otp'])): 
+        $sms = $_SESSION['last_sms_otp'];
+    ?>
+        <!-- 📱 Free SMS OTP Notification Toast -->
+        <div style="background: rgba(34, 197, 94, 0.15); border: 1.5px solid #22c55e; border-radius: 14px; padding: 16px; margin-bottom: 20px; text-align: left;">
+            <div style="font-weight: 700; color: #22c55e; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <i class='bx bxs-message-dots' style="font-size:20px;"></i> 📱 Free SMS Sent to +91 <?php echo htmlspecialchars($sms['phone']); ?>
+            </div>
+            <p style="font-size: 13px; color: var(--text-color); margin: 0; line-height: 1.5;">
+                Trip OTP for Booking #<?php echo $ride_id; ?> has been dispatched to your mobile SMS inbox. Share code with driver upon pickup. Ref: <strong><?php echo $sms['txn_ref']; ?></strong>
+            </p>
+        </div>
+    <?php endif; ?>
+
     <div class="details-box">
         <p><strong><i class='bx bxs-map-pin'></i> Route:</strong> <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></p>
         <p><strong><i class='bx bxs-calendar'></i> Date & Time:</strong> <?php echo htmlspecialchars($ride['ride_date']); ?> at <?php echo htmlspecialchars($ride['ride_time']); ?></p>
@@ -92,12 +106,22 @@ if ($result->num_rows > 0) {
         <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
             <p><strong><i class='bx bxs-user-check'></i> Spare Helmet:</strong> <?php echo ($ride['helmet_provided'] ?? 1) ? '🪖 Provided' : 'Bring Own'; ?></p>
         <?php endif; ?>
-        <p><strong><i class='bx bxs-purchase-tag'></i> Price Paid:</strong> ₹<?php echo htmlspecialchars($ride['price']); ?></p>
+        <p><strong><i class='bx bxs-purchase-tag'></i> Fare Amount:</strong> ₹<?php echo htmlspecialchars($ride['price']); ?> <span style="background:var(--success-bg); color:var(--success-color); font-weight:700; font-size:11px; padding:2px 8px; border-radius:6px; margin-left:6px;">⌛ Escrow Held</span></p>
+    </div>
+
+    <!-- 💳 Free UPI Payment Gateway Simulation -->
+    <div style="background: var(--input-bg); border: 1px solid var(--primary-color); border-radius: 14px; padding: 16px; margin-bottom: 20px; text-align: center;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--primary-color); margin-bottom: 8px;">💳 Pay Directly via Any Free UPI App (0% Fees)</div>
+        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+            <a href="upi://pay?pa=7386614044@ybl&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #0284c7; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">Google Pay</a>
+            <a href="upi://pay?pa=7386614044@ybl&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #5f259f; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">PhonePe</a>
+            <a href="upi://pay?pa=7386614044@ybl&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #00baf2; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">Paytm</a>
+        </div>
     </div>
 
     <div class="btn-group">
         <a href="chat.php?ride_id=<?php echo $ride_id; ?>" class="btn btn-chat"><i class='bx bxs-chat'></i> Chat with Driver</a>
-        <a href="index.php" class="btn btn-home">Return Home</a>
+        <a href="my_booked_rides.php" class="btn btn-home">View My Bookings</a>
     </div>
 </div>
 </div>

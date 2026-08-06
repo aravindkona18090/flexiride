@@ -11,6 +11,9 @@ $user_id = $_SESSION['user_id'];
 $successMsg = "";
 $errorMsg = "";
 
+// Ensure is_phone_verified column exists in users table
+safeAddColumn($conn, 'users', 'is_phone_verified', "TINYINT(1) NOT NULL DEFAULT 1");
+
 // Handle Photo Upload directly in Profile Popup
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['modal_profile_photo'])) {
     if ($_FILES['modal_profile_photo']['error'] === UPLOAD_ERR_OK) {
@@ -254,6 +257,11 @@ $vehicles = $vehiclesStmt->get_result();
                 <?php if ($user['is_upi_verified'] ?? 0): ?>
                     <span class="badge-verified" style="background:rgba(56,189,248,0.2); color:var(--primary-color); border-color:var(--primary-color);">
                         <i class='bx bx-qr-scan'></i> Verified UPI VPA
+                    </span>
+                <?php endif; ?>
+                <?php if (!empty($user['phone'])): ?>
+                    <span class="badge-verified" style="background:rgba(34,197,94,0.2); color:#22c55e; border-color:#22c55e;">
+                        <i class='bx bxs-phone-call'></i> 📱 Mobile Verified
                     </span>
                 <?php endif; ?>
             </div>

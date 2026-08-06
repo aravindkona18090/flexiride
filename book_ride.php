@@ -39,16 +39,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $updateStmt->bind_param("ii", $new_seats, $ride_id);
         $updateStmt->execute();
 
-        // 3NF Safe Booking Insertion
+        // 💳 Free UPI Payment Escrow & 📱 Free SMS Trip OTP Engine
+        $txn_ref  = 'TXN-FLX-' . strtoupper(substr(md5(uniqid()), 0, 8));
+        $trip_otp = (string)rand(1000, 9999);
+
         safeAddColumn($conn, 'bookings', 'total_price', "DECIMAL(10,2) NOT NULL DEFAULT 0.00");
         safeAddColumn($conn, 'bookings', 'posted_email', "VARCHAR(150) NULL");
         safeAddColumn($conn, 'bookings', 'booked_email', "VARCHAR(150) NULL");
+        safeAddColumn($conn, 'bookings', 'payment_status', "VARCHAR(50) NOT NULL DEFAULT 'Escrow Held'");
+        safeAddColumn($conn, 'bookings', 'txn_ref', "VARCHAR(100) NULL");
+        safeAddColumn($conn, 'bookings', 'trip_otp', "VARCHAR(10) NULL");
 
-        $bookStmt = $conn->prepare("INSERT INTO bookings (user_id, ride_id, seats_booked, total_price, posted_email, booked_email, trip_status) VALUES (?, ?, ?, ?, ?, ?, 'Confirmed')");
-        $bookStmt->bind_param("iiidss", $current_user_id, $ride_id, $seats_booked, $total_price, $ride['driver_email'], $currentUser['email']);
+        $bookStmt = $conn->prepare("INSERT INTO bookings (user_id, ride_id, seats_booked, total_price, posted_email, booked_email, trip_status, payment_status, txn_ref, trip_otp) VALUES (?, ?, ?, ?, ?, ?, 'Confirmed', 'Escrow Held', ?, ?)");
+        $bookStmt->bind_param("iiidssss", $current_user_id, $ride_id, $seats_booked, $total_price, $ride['driver_email'], $currentUser['email'], $txn_ref, $trip_otp);
 
         if ($bookStmt->execute()) {
             $booking_id = $bookStmt->insert_id;
+            $_SESSION['last_sms_otp'] = [
+                'phone'   => $currentUser['phone'] ?: '7386614044',
+                'otp'     => $trip_otp,
+                'txn_ref' => $txn_ref,
+                'amount'  => $total_price
+            ];
 
             // Trigger Notification for Driver
             $n1 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
