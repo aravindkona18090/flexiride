@@ -1,72 +1,78 @@
 # 🚗 FlexiRide
 
-A full-stack ride-sharing web application that connects drivers and passengers for safe, affordable, and convenient travel. Users can post rides, search for available rides, book seats, manage their rides, and use emergency safety features.
+**Safe, affordable, shared rides — for everyone going the same way.**
+
+A full-stack ride-sharing web application that connects drivers and passengers, inspired by services like BlaBlaCar. Post a ride, find a ride, book a seat, and travel with built-in safety features.
+
+<p>
+  <img src="https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white" alt="MySQL">
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black" alt="JavaScript">
+  <img src="https://img.shields.io/badge/Composer-885630?style=flat&logo=composer&logoColor=white" alt="Composer">
+  <img src="https://img.shields.io/badge/status-active-success" alt="status">
+</p>
+
+**🔗 Live Demo:** [flexiride.up.railway.app](https://flexiride.up.railway.app/)
 
 ---
 
 ## 📖 Overview
 
-FlexiRide is a PHP and MySQL-based ride-sharing platform inspired by services like BlaBlaCar. It provides an easy way for users to share rides while incorporating features such as profile management, OTP-based password recovery, emergency assistance, ride booking, feedback collection, and an admin dashboard.
+FlexiRide is a PHP and MySQL ride-sharing platform built around four things: **easy ride posting and discovery, secure profile management, OTP-based account recovery, and rider safety** — all wrapped in a straightforward booking flow with feedback collection and an admin dashboard to keep the platform healthy.
 
 ---
 
 ## ✨ Features
 
 ### 👤 User Module
-- User Registration & Login
-- Secure Authentication
-- Profile Management
-- Upload Profile Photo
-- Forgot Password using OTP
+- Registration & secure login
+- Profile management with photo upload
+- Forgot password via OTP
 - Logout
 
 ### 🚘 Ride Management
-- Post a Ride
-- Find Available Rides
-- Book Ride
-- View Booked Rides
-- Edit Ride Details
-- Delete Ride
-- Mark Ride as Reached
-- View My Posted Rides
+- Post a ride
+- Find available rides
+- Book a ride
+- View booked & posted rides
+- Edit or delete ride details
+- Mark a ride as reached
 
 ### 🛡️ Safety Features
-- Emergency SOS (Danger Button)
-- Emergency Email Notifications
-- User Verification
-- Privacy Policy
+- Emergency SOS ("Danger") button
+- Automatic emergency email notifications
+- User verification
+- Privacy policy in-app
 
-### ⭐ Feedback & Queries
-- Submit Feedback
-- Contact/Queries Module
+### ⭐ Feedback & Support
+- Submit feedback
+- Contact / queries module
 
 ### 👨‍💼 Admin Module
-- Admin Login
-- Admin Dashboard
-- Manage Users
-- Edit User Details
-- Delete Users
-- View User Feedback
-- View User Queries
+- Admin login & dashboard
+- Manage, edit, or delete users
+- View user feedback and queries
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- HTML5
-- CSS3
-- JavaScript
+| Layer | Technology |
+|---|---|
+| Frontend | HTML5, CSS3, JavaScript |
+| Backend | PHP |
+| Database | MySQL |
+| Libraries | PHPMailer, Composer |
 
-### Backend
-- PHP
+---
 
-### Database
-- MySQL
+## 🔒 Security
 
-### Libraries
-- PHPMailer
-- Composer
+- Password hashing
+- Session-based authentication
+- OTP password recovery
+- Prepared SQL statements
+- Input validation
 
 ---
 
@@ -118,102 +124,65 @@ FlexiRide/
 
 ---
 
-## 🗄️ Database
+## 🚀 Getting Started
 
-Database Name:
-
-```
-blablacar_clone
-```
-
-Import the provided SQL file before running the application.
-
----
-
-## 🚀 Installation
-
-1. Install XAMPP.
-2. Start Apache and MySQL.
+1. Install [XAMPP](https://www.apachefriends.org/).
+2. Start **Apache** and **MySQL**.
 3. Copy the project into:
+   ```
+   C:\xampp\htdocs\
+   ```
+4. Open phpMyAdmin and create a database named:
+   ```
+   blablacar_clone
+   ```
+5. Import:
+   ```
+   blablacar_clone.sql
+   ```
+6. Update the database credentials in:
+   ```
+   db.php
+   ```
+7. Open your browser:
+   ```
+   http://localhost/FlexiRide
+   ```
 
-```
-C:\xampp\htdocs\
-```
-
-4. Open phpMyAdmin.
-5. Create a database named:
-
-```
-blablacar_clone
-```
-
-6. Import:
-
-```
-blablacar_clone.sql
-```
-
-7. Update the database credentials in:
-
-```
-db.php
-```
-
-8. Open your browser:
-
-```
-http://localhost/FlexiRide
-```
+> Prefer not to set up locally? Try the live demo instead: **[flexiride.up.railway.app](https://flexiride.up.railway.app/)**
 
 ---
-
 
 ## 📸 Screenshots
-
 
 ```
 screenshots/
 ```
 
 ![Home](screenshots/home.png)
-
 ![Post Ride](screenshots/post-ride.png)
-
 ![Find Ride](screenshots/find-ride.png)
-
 ![My Rides](screenshots/myrides.png)
-```
-
----
-
-## 🔒 Security
-
-- Password Hashing
-- Session Authentication
-- OTP Password Recovery
-- Prepared SQL Statements
-- Input Validation
 
 ---
 
 ## 🎯 Future Enhancements
 
-- Google Maps Integration
-- Live GPS Tracking
-- Ride Ratings & Reviews
-- AI-based Ride Recommendations
-- Real-time Notifications
-- Mobile Application
+- Google Maps integration
+- Live GPS tracking
+- Ride ratings & reviews
+- AI-based ride recommendations
+- Real-time notifications
+- Mobile application
 
 ---
 
 ## 👨‍💻 Author
 
 **Kona Aravind Ranga Reddy**
+B.Tech, Artificial Intelligence & Machine Learning
 
-B.Tech – Artificial Intelligence & Machine Learning
-
-GitHub: https://github.com/aravindkona18090
+- GitHub: [@aravindkona18090](https://github.com/aravindkona18090)
 
 ---
 
