@@ -1,5 +1,7 @@
 <?php
 // Master Database Configuration & Helper Utilities
+date_default_timezone_set('Asia/Kolkata');
+
 $host = getenv('MYSQLHOST') ?: (getenv('DB_HOST') ?: 'localhost');
 $user = getenv('MYSQLUSER') ?: (getenv('DB_USER') ?: 'root');
 $pass = getenv('MYSQLPASSWORD') ?: (getenv('DB_PASS') ?: '');
@@ -19,6 +21,20 @@ function safeAddColumn($conn, $table, $column, $definition) {
     $check = $conn->query("SHOW COLUMNS FROM `$table` LIKE '$column'");
     if ($check && $check->num_rows == 0) {
         @$conn->query("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
+    }
+}
+
+// Clean long Nominatim/OpenStreetMap multi-word strings into concise primary city names
+if (!function_exists('cleanShortAddress')) {
+    function cleanShortAddress($str) {
+        if (empty($str)) return '';
+        $viaStr = '';
+        if (preg_match('/\((Via [^\)]+)\)/i', $str, $m)) {
+            $viaStr = ' (' . $m[1] . ')';
+        }
+        $clean = preg_replace('/\([^\)]+\)/', '', $str);
+        $parts = array_map('trim', explode(',', $clean));
+        return ($parts[0] ?? $str) . $viaStr;
     }
 }
 

@@ -207,7 +207,13 @@ $vehicles = $vehiclesStmt->get_result();
 </head>
 <body>
 
-<?php include_once __DIR__ . '/includes/navbar.php'; ?>
+<?php 
+if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true) {
+    include_once __DIR__ . '/includes/admin_navbar.php';
+} else {
+    include_once __DIR__ . '/includes/navbar.php';
+}
+?>
 
 <div class="container">
     <?php if ($successMsg): ?>

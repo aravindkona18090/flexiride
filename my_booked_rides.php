@@ -245,28 +245,34 @@ $result = $stmt->get_result();
                 <div style="text-align:right;">
                     <div style="font-size:24px; font-weight:700; color:var(--success-color); margin-bottom:10px;">₹<?php echo $ride['price']; ?></div>
                     <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end;">
-                        <!-- WhatsApp Emergency SOS Button -->
-                        <a href="<?php echo $sosWaUrl; ?>" target="_blank" class="btn-sos-wa" title="Send Emergency SOS Alert via WhatsApp">
-                            <i class='bx bxs-alarm-exclamation'></i> 🚨 SOS WhatsApp
-                        </a>
+                        <?php if ($computedStatus === 'cancelled'): ?>
+                            <span style="font-size:13px; padding:6px 12px; border-radius:8px; background:var(--danger-bg); color:var(--danger-color); border:1px solid var(--danger-color); display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+                                <i class='bx bxs-x-circle'></i> Booking Cancelled
+                            </span>
+                        <?php elseif ($computedStatus === 'completed'): ?>
+                            <a href="receipt.php?booking_id=<?php echo $ride['booking_id']; ?>" class="btn-receipt"><i class='bx bxs-file-pdf'></i> Receipt</a>
+                            <a href="rate_ride.php?ride_id=<?php echo $ride['id']; ?>&driver_id=<?php echo $ride['user_id']; ?>" class="btn-chat" style="background:#f59e0b;"><i class='bx bxs-star'></i> Rate Driver</a>
+                        <?php else: ?>
+                            <!-- WhatsApp Emergency SOS Button -->
+                            <a href="<?php echo $sosWaUrl; ?>" target="_blank" class="btn-sos-wa" title="Send Emergency SOS Alert via WhatsApp">
+                                <i class='bx bxs-alarm-exclamation'></i> 🚨 SOS WhatsApp
+                            </a>
 
-                        <!-- WhatsApp Share Ride Button -->
-                        <a href="<?php echo $waShareUrl; ?>" target="_blank" class="btn-wa-share" title="Share Ride Details on WhatsApp">
-                            <i class='bx bxl-whatsapp'></i> Share
-                        </a>
+                            <!-- WhatsApp Share Ride Button -->
+                            <a href="<?php echo $waShareUrl; ?>" target="_blank" class="btn-wa-share" title="Share Ride Details on WhatsApp">
+                                <i class='bx bxl-whatsapp'></i> Share
+                            </a>
 
-                        <?php if (!empty($ride['driver_upi'])): ?>
-                            <button class="btn-pay-qr" onclick="showQrModal('<?php echo htmlspecialchars($ride['driver_upi']); ?>', '<?php echo $ride['price']; ?>', '<?php echo htmlspecialchars($ride['driver_name']); ?>')">
-                                <i class='bx bx-qr-scan'></i> Pay UPI
-                            </button>
-                        <?php endif; ?>
+                            <?php if (!empty($ride['driver_upi'])): ?>
+                                <button class="btn-pay-qr" onclick="showQrModal('<?php echo htmlspecialchars($ride['driver_upi']); ?>', '<?php echo $ride['price']; ?>', '<?php echo htmlspecialchars($ride['driver_name']); ?>')">
+                                    <i class='bx bx-qr-scan'></i> Pay UPI
+                                </button>
+                            <?php endif; ?>
 
-                        <a href="<?php echo $mapsUrl; ?>" target="_blank" class="btn-nav-map"><i class='bx bxs-map-pin'></i> Pickup Spot</a>
-                        <a href="chat.php?ride_id=<?php echo $ride['id']; ?>" class="btn-chat"><i class='bx bx-message-rounded-dots'></i> Chat</a>
-                        <a href="receipt.php?booking_id=<?php echo $ride['booking_id']; ?>" class="btn-receipt"><i class='bx bxs-file-pdf'></i> Receipt</a>
-                        <a href="rate_ride.php?ride_id=<?php echo $ride['id']; ?>&driver_id=<?php echo $ride['user_id']; ?>" class="btn-chat" style="background:#f59e0b;">⭐ Rate</a>
+                            <a href="<?php echo $mapsUrl; ?>" target="_blank" class="btn-nav-map"><i class='bx bxs-map-pin'></i> Pickup Spot</a>
+                            <a href="chat.php?ride_id=<?php echo $ride['id']; ?>" class="btn-chat"><i class='bx bx-message-rounded-dots'></i> Chat</a>
+                            <a href="receipt.php?booking_id=<?php echo $ride['booking_id']; ?>" class="btn-receipt"><i class='bx bxs-file-pdf'></i> Receipt</a>
 
-                        <?php if ($ride['trip_status'] !== 'Cancelled'): ?>
                             <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this booking? Seats will be restored to the driver.');">
                                 <input type="hidden" name="cancel_booking_id" value="<?php echo $ride['booking_id']; ?>">
                                 <button type="submit" class="btn-sos-wa" style="background:#dc2626;" title="Cancel Booking"><i class='bx bx-x-circle'></i> Cancel</button>

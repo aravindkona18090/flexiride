@@ -78,14 +78,13 @@ $result = $conn->query($sql);
 </head>
 <body>
 
-<?php include_once __DIR__ . '/../includes/navbar.php'; ?>
+<?php include_once __DIR__ . '/../includes/admin_navbar.php'; ?>
 
 <div class="container">
     <div class="header-box">
         <h2>👥 Commuter Account Management</h2>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <a href='../index.php' class="btn-back"><i class='bx bx-home-alt'></i> 🏠 Home</a>
-            <a href="admin_dashboard.php" class="btn-back"><i class='bx bx-left-arrow-alt'></i> Admin Dashboard</a>
+        <div>
+            <a href="admin_dashboard.php" class="btn-back"><i class='bx bx-left-arrow-alt'></i> Back to Dashboard</a>
         </div>
     </div>
 

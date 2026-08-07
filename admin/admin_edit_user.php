@@ -282,6 +282,7 @@ p {  /* Smaller font size */
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
+<?php include_once __DIR__ . '/../includes/admin_navbar.php'; ?>
 <div class="edit-profile-container">
     <h2>Edit User Profile</h2>
     <form action="admin_edit_user.php" method="POST">

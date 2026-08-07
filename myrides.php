@@ -152,13 +152,20 @@ $my_rides = $stmt->get_result();
     <?php if ($my_rides->num_rows > 0): ?>
         <?php while ($ride = $my_rides->fetch_assoc()): ?>
             <?php 
-                $mapsUrl = "https://www.google.com/maps/search/?api=1&query=" . urlencode($ride['origin']);
+                $cleanOrig = cleanShortAddress($ride['origin']);
+                $cleanDest = cleanShortAddress($ride['destination']);
+
+                $offeredSeats = max(1, (int)$ride['seats_available']);
+                $bookedSeats = (int)$ride['booked_count'];
+                $seatsRemaining = max(0, $offeredSeats - $bookedSeats);
+
+                $mapsUrl = "https://www.google.com/maps/search/?api=1&query=" . urlencode($cleanOrig);
                 $waText = "🏍️ *FlexiRide Trip Offer*\n" .
-                          "📍 Pickup: " . $ride['origin'] . "\n" .
-                          "🏁 Drop: " . $ride['destination'] . "\n" .
-                          "📅 Date & Time: " . $ride['ride_date'] . " at " . $ride['ride_time'] . "\n" .
+                          "📍 Pickup: " . $cleanOrig . "\n" .
+                          "🏁 Drop: " . $cleanDest . "\n" .
+                          "📅 Date & Time: " . $ride['ride_date'] . " at " . date('h:i A', strtotime($ride['ride_time'])) . "\n" .
                           "🚘 Vehicle: " . ($ride['vehicle_model'] ?: $ride['vehicle_type']) . "\n" .
-                          "💺 Available Seats: " . ($ride['seats_available'] - $ride['booked_count']) . "\n" .
+                          "💺 Available Seats: " . $seatsRemaining . "\n" .
                           "📍 Pickup Location Map: " . $mapsUrl;
                 $waUrl = "https://api.whatsapp.com/send?text=" . urlencode($waText);
 
@@ -176,7 +183,7 @@ $my_rides = $stmt->get_result();
             ?>
             <div class="ride-card" data-status="<?php echo $computedStatus; ?>">
                 <div>
-                    <div style="margin-bottom:8px;">
+                    <div style="margin-bottom:10px; display:flex; align-items:center; gap:8px;">
                         <?php if ($computedStatus === 'cancelled'): ?>
                             <span class="status-badge status-cancelled"><i class='bx bxs-x-circle'></i> Status: Cancelled</span>
                         <?php elseif ($computedStatus === 'completed'): ?>
@@ -185,31 +192,34 @@ $my_rides = $stmt->get_result();
                             <span class="status-badge status-active"><i class='bx bxs-check-circle'></i> Status: Active</span>
                         <?php endif; ?>
                     </div>
-                    <h3 style="font-size:20px; margin-bottom:6px;"><?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></h3>
-                    <p style="font-size:14px; color:var(--text-muted); margin-bottom:6px;">
-                        🚘 Vehicle: <strong><?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_type']); ?></strong>
-                        | Fare: <strong>₹<?php echo $ride['price']; ?>/seat</strong>
-                    </p>
+                    <h3 style="font-size:18px; margin-bottom:8px; line-height:1.4; color:var(--text-color);">
+                        📍 <?php echo htmlspecialchars($cleanOrig); ?> <span style="color:var(--primary-color); margin:0 4px;">➔</span> 🏁 <?php echo htmlspecialchars($cleanDest); ?>
+                    </h3>
                     <p style="font-size:13px; color:var(--text-muted);">
-                        📅 <?php echo $ride['ride_date']; ?> at <?php echo $ride['ride_time']; ?> | 
-                        💺 Bookings: <strong><?php echo $ride['booked_count']; ?> / <?php echo $ride['seats_available']; ?> seats booked</strong>
+                        📅 <?php echo $ride['ride_date']; ?> at <?php echo date('h:i A', strtotime($ride['ride_time'])); ?> | 
+                        💺 <strong><?php echo $bookedSeats; ?> / <?php echo $offeredSeats; ?> seats booked</strong>
                     </p>
                 </div>
 
                 <div style="text-align:right;">
-                    <div style="font-size:24px; font-weight:700; color:var(--primary-color); margin-bottom:10px;">₹<?php echo $ride['price']; ?></div>
+                    <div style="font-size:24px; font-weight:700; color:var(--primary-color); margin-bottom:10px;">₹<?php echo number_format($ride['price'], 2); ?></div>
                     <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end;">
-                        <!-- WhatsApp Share Trip Button -->
-                        <a href="<?php echo $waUrl; ?>" target="_blank" class="btn-wa-share" title="Share Trip on WhatsApp">
-                            <i class='bx bxl-whatsapp'></i> Share WhatsApp
-                        </a>
+                        <!-- View Details Button -->
+                        <a href="ride_details.php?id=<?php echo $ride['id']; ?>" class="btn-chat" style="background:var(--primary-color);"><i class='bx bx-search'></i> View Details</a>
 
-                        <a href="chat.php?ride_id=<?php echo $ride['id']; ?>" class="btn-chat"><i class='bx bx-message-rounded-dots'></i> Passenger Chat</a>
+                        <?php if ($computedStatus === 'active'): ?>
+                            <!-- WhatsApp Share Trip Button -->
+                            <a href="<?php echo $waUrl; ?>" target="_blank" class="btn-wa-share" title="Share Trip on WhatsApp">
+                                <i class='bx bxl-whatsapp'></i> Share
+                            </a>
 
-                        <?php if (($ride['trip_status'] ?? 'active') !== 'cancelled'): ?>
+                            <?php if ($ride['booked_count'] > 0): ?>
+                                <a href="chat.php?ride_id=<?php echo $ride['id']; ?>" class="btn-chat" style="background:#3b82f6;"><i class='bx bx-message-rounded-dots'></i> Chat</a>
+                            <?php endif; ?>
+
                             <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this offered ride? All passengers will be notified.');">
                                 <input type="hidden" name="cancel_ride_id" value="<?php echo $ride['id']; ?>">
-                                <button type="submit" class="btn-cancel"><i class='bx bx-x-circle'></i> Cancel Ride</button>
+                                <button type="submit" class="btn-cancel"><i class='bx bx-x-circle'></i> Cancel</button>
                             </form>
                         <?php endif; ?>
                     </div>
