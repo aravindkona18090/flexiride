@@ -1,489 +1,239 @@
 <?php
-if (isset($_GET["error"])) {
-    $error = $_GET["error"];
-    $error_message = $error; // Assign error message
-} else {
-    $error_message = ""; // Default value for $error_message when no error exists
-}
-if (isset($_GET["error2"])) {
-    $error = $_GET["error2"];
-    $error_message2 = $error; // Assign error message
-} else {
-    $error_message2 = ""; // Default value for $error_message when no error exists
+session_start();
+include 'db.php';
+include 'mailer.php';
+
+$error = '';
+$success = '';
+$showOtpStep = false;
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $action = $_POST['action'] ?? 'login';
+
+    if ($action === 'send_otp') {
+        $name     = trim($_POST['name']);
+        $email    = trim($_POST['email']);
+        $phone    = trim($_POST['phone']);
+        $password = $_POST['password'];
+
+        $checkStmt = $conn->prepare("SELECT id FROM users WHERE email = ? OR phone = ?");
+        $checkStmt->bind_param("ss", $email, $phone);
+        $checkStmt->execute();
+        
+        if ($checkStmt->get_result()->num_rows > 0) {
+            $error = "Account with this Email or Phone already exists!";
+        } else {
+            // Generate 6-Digit Random Security OTP
+            $otp = random_int(100000, 999999);
+            $_SESSION['temp_reg'] = [
+                'name'     => $name,
+                'email'    => $email,
+                'phone'    => $phone,
+                'password' => password_hash($password, PASSWORD_BCRYPT),
+                'otp'      => (string)$otp,
+                'expire'   => time() + 600 // 10 mins expiry
+            ];
+
+            // Send Email OTP via Resend
+            $otpHtml = "
+                <div style='font-family:Arial,sans-serif; padding:20px; background:#0f172a; color:#f8fafc; border-radius:12px;'>
+                    <h2 style='color:#38bdf8;'>FlexiRide Security OTP</h2>
+                    <p>Hi <strong>{$name}</strong>,</p>
+                    <p>Your 6-digit OTP code to verify your FlexiRide account is:</p>
+                    <div style='font-size:32px; font-weight:800; color:#4ade80; letter-spacing:5px; margin:20px 0;'>{$otp}</div>
+                    <p style='color:#94a3b8; font-size:13px;'>Valid for 10 minutes. Do not share this code with anyone.</p>
+                </div>
+            ";
+            sendResendMail($email, $name, 'FlexiRide - Account Verification OTP Code', $otpHtml);
+
+            $showOtpStep = true;
+            $success = "6-Digit Verification OTP sent to {$email}!";
+        }
+    } elseif ($action === 'verify_otp') {
+        $enteredOtp = trim($_POST['otp_code']);
+        $temp = $_SESSION['temp_reg'] ?? null;
+
+        if ($temp && (string)$temp['otp'] === (string)$enteredOtp && time() <= $temp['expire']) {
+            // OTP Verified! Create user in database
+            $stmt = $conn->prepare("INSERT INTO users (name, email, phone, password, is_verified) VALUES (?, ?, ?, ?, 1)");
+            $stmt->bind_param("ssss", $temp['name'], $temp['email'], $temp['phone'], $temp['password']);
+            
+            if ($stmt->execute()) {
+                $user_id = $stmt->insert_id;
+                $_SESSION['user_id'] = $user_id;
+                $_SESSION['name']    = $temp['name'];
+                unset($_SESSION['temp_reg']);
+                header("Location: profile.php");
+                exit();
+            } else {
+                $error = "Account creation failed: " . $conn->error;
+            }
+        } else {
+            $showOtpStep = true;
+            $error = "Invalid or expired OTP code! Please check your email or resend.";
+        }
+    } else {
+        $email    = trim($_POST['email']);
+        $password = $_POST['password'];
+
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+
+        if ($user && password_verify($password, $user['password'])) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['name']    = $user['name'];
+            header("Location: index.php");
+            exit();
+        } else {
+            $error = "Invalid Email or Password!";
+        }
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
-<!-- coding by @_.codedevotee -->
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Register form</title>
-
-    <!--Boxicons CDN-->
-    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' 
-    rel='stylesheet'>
-
-    <!--Custom CSS-->
+    <title>Login & OTP Verification - FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-
-:root{
-    --white: #fff;
-    --black: #000; 
-    --lightBulue: #17a;
-}
-
-*{
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Poppins', sans-serif;
-}
-
-body{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-}
-
-.wrapper{
-    position: relative;
-    width: 850px;
-    height: 550px;
-    background: var(--white);
-    border: 2px solid var(--black);
-    border-radius: 10px;
-    box-shadow: 0 0 20px var(--black);
-    overflow: hidden;
-}
-
-
-.wrapper .form-box{
-    position: absolute;
-    top: 0;
-    width: 50%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-}
-
-.wrapper .form-box.login{
-    left: 0;
-    padding: 0 60px 0 40px;
-}
-
-.form-box h2{
-    margin-bottom: 10px;
-    position: relative;
-    font-size: 32px;
-    color: var(--black);
-    text-align: center;
-}
-
-.form-box h2::after{
-    content: "";
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
-    height: 4px;
-    background: var(--black);
-}
-
-.form-box .input-box{
-    position: relative;
-    width: 100%;
-    height: 50px;
-    margin: 25px 0;
-}
-
-.input-box input{
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    color: var(--black);
-    font-size: 16px;
-    font-weight: 500;
-    border: none;
-    outline: none;
-    border-bottom: 2px solid var(--black);
-    transition: .5s;
-    padding-right: 23px;
-}
-
-.input-box input:focus,
-.input-box input:valid{
-    border-bottom-color: var(--lightBulue);
-}
-
-.input-box label{
-    position: absolute;
-    top: 50%;
-    left: 0;
-    transform: translateY(-50%);
-    font-size: 16px;
-    color: var(--black);
-    pointer-events: none;
-    transition: 0.5s;
-}
-
-
-.input-box input:focus~label,
-.input-box input:valid~label{
-    top: -5px;
-    color: var(--lightBulue);
-}
-
-
-.input-box i{
-    position: absolute;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
-    font-size: 18px;
-    transition: 0.5s;
-}
-
-.input-box input:focus~i,
-.input-box input:valid~i{
-    color: var(--lightBulue);
-}
-
-form button{
-    width: 100%;
-    height: 45px;
-    background-color: var(--black);
-    color: var(--white);
-    border: none;
-    outline: none;
-    border-radius: 40px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 600;
-    transition: .3s;
-}
-
-form button:hover{
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
-}
-
-form .linkTxt{
-    font-size: 14px;
-    color: var(--black);
-    text-align: center;
-    margin: 20px 0 10px;
-}
-
-.linkTxt p a{
-    color: blue;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.wrapper .form-box.login .animation{
-    transform: translateX(0);
-    transition: 0.7s ease;
-    opacity: 1;
-    filter: blur(0);
-    transition-delay: calc(.1s * var(--j));
-}
-
-
-.wrapper.active .form-box.login .animation{
-    transform: translateX(-120%);
-    opacity: 0;
-    filter: blur(10px);
-    transition-delay: calc(.1s * var(--i));
-}
-
-
-
-
-
-
-.wrapper .info-text{
-    position: absolute;
-    top: 0;
-    width: 50%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.wrapper .info-text.login{
-    right: 0;
-    text-align: right;
-    padding: 0 40px 60px 150px;
-
-}
-
-.wrapper .info-text h2{
-    font-size: 36px;
-    color: var(--white);
-    line-height: 1.3;
-    text-transform: uppercase;
-}
-
-.wrapper .info-text p{
-    font-size: 16px;
-    color: var(--white);
-}
-
-
-.wrapper .info-text.login .animation{
-    transform: translateX(0);
-    opacity: 1;
-    filter: blur(0);
-    transition: 0.7s ease;
-    transition-delay: calc(.1s * var(--j));
-}
-.wrapper.active .info-text.login .animation{
-    transform: translateX(120px);
-    opacity: 0;
-    filter: blur(10px);
-    transition: 0.7s ease;
-    transition-delay: calc(.1s * var(--i));
-}
-
-
-
-
-
-.wrapper .rotate-bg{
-    position: absolute;
-    top: -4px;
-    right: 0;
-    width: 950px;
-    height: 700px;
-    background: #000;
-    transform: rotate(10deg) skewY(40deg);
-    transform-origin: bottom right;
-    transition: 1.5s ease;
-    transition-delay: 1.6s;
-}
-
-.wrapper.active .rotate-bg{
-    transform: rotate(0) skewY(0);
-    transition-delay: 0.5s;
-}
-
-
-
-
-
-
-
-
-
-
-
-.wrapper .form-box.register{
-    padding: 0 40px 0 60px;
-    right: 0;
-}
-
-.wrapper.active .form-box.register{
-    pointer-events: auto;
-}
-
-
-.wrapper .form-box.register .animation{
-    transform: translateX(120%);
-    opacity: 0;
-    filter: blur(10px);
-    transition: .7s ease;
-    transition-delay: calc(.1s * var(--j));
-}
-
-.wrapper.active .form-box.register .animation{
-    transform: translateX(0);
-    opacity: 1;
-    filter: blur(0);
-    transition-delay: calc(.1s * var(--i));
-}
-
-
-
-.wrapper .info-text.register{
-    left: 0;
-    text-align: left;
-    padding: 0 150px 60px 40px;
-    pointer-events: none;
-}
-
-.wrapper.active .info-text.register{
-    pointer-events: auto;
-}
-
-
-.wrapper .info-text.register .animation{
-    transform: translateX(-120%);
-    opacity: 0;
-    filter: blur(10px);
-    transition: .7s ease;
-    transition-delay: calc(.1s * var(--j));
-}
-
-.wrapper.active .info-text.register .animation{
-    transform: translateX(0);
-    opacity: 1;
-    filter: blur(0);
-    transition-delay: calc(.1s * var(--i));
-}
-
-
-
-
-.wrapper .rotate-bg2{
-    position: absolute;
-    top: 100%;
-    left: 250px;
-    width: 850px;
-    height: 700px;
-    background: var(--white);
-    transform: rotate(0) skewY(0);
-    transform-origin: bottom left;
-    transition: 1.5s ease;
-    transition-delay: 0.5s;
-}
-
-.wrapper.active .rotate-bg2{
-    transform: rotate(-11deg) skewY(-40deg);
-    transition-delay: 1.2s;
-}
-.input-box input[type="tel"] {
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    color: var(--black);
-    font-size: 16px;
-    font-weight: 500;
-    border: none;
-    outline: none;
-    border-bottom: 2px solid var(--black);
-    transition: 0.5s;
-    padding-right: 23px;
-}
-
-.input-box input[type="tel"]:focus,
-.input-box input[type="tel"]:valid {
-    border-bottom-color: var(--lightBulue);
-}
-
-.input-box input[type="tel"]:focus~label,
-.input-box input[type="tel"]:valid~label {
-    top: -5px;
-    color: var(--lightBulue);
-}
-
-.input-box input[type="tel"]:focus~i,
-.input-box input[type="tel"]:valid~i {
-    color: var(--lightBulue);
-}
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
+
+        .auth-container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 40px 20px; }
+        .auth-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+        }
+
+        .auth-tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 1px solid var(--card-border); padding-bottom: 15px; }
+        .tab-btn {
+            flex: 1; padding: 12px; border: none; background: transparent; color: var(--text-muted);
+            font-size: 16px; font-weight: 600; cursor: pointer; border-radius: 10px; transition: 0.3s;
+        }
+        .tab-btn.active { background: rgba(56, 189, 248, 0.15); color: var(--primary-color); }
+
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); font-weight: 500; }
+        .form-group input {
+            width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--input-border);
+            background: var(--input-bg); color: var(--text-color); font-size: 15px; outline: none;
+        }
+
+        .btn-auth {
+            width: 100%; padding: 16px; border: none; border-radius: 12px;
+            background: var(--primary-gradient);
+            color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s;
+        }
+        .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4); }
+
+        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; font-size: 14px; }
+        .alert-success { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; font-size: 14px; }
     </style>
-
 </head>
-
 <body>
-    <div class="wrapper">
-        <span class="rotate-bg"></span>
-        <span class="rotate-bg2"></span>
 
-      
-         <div class="form-box login">
-                    <h2 class="title animation" style="--i:0; --j:21">Login</h2>
-                    <form action="login1.php" method="post">
-        
-                        <div class="input-box animation" style="--i:1; --j:22">
-                            <input type="text" name="email" required>
-                            <label for="email">Email</label>
-                            <i class='bx bxs-user'></i>
-                        </div>
-        
-                        <div class="input-box animation" style="--i:2; --j:23">
-                            <input type="password" name="password" required>
-                            <label for="password">Password</label>
-                            <i class='bx bxs-lock-alt'></i>
-                        </div>
-                        <button type="submit" class="btn animation" style="--i:3; --j:24">Login</button>
-                        <div class="linkTxt animation" style="--i:5; --j:25">
-                            <p>Don't have an account? <a href="#" class="register-link">Sign Up</a></p>
-                            <p><a href="forgot_password.php">Forgot Password?</a></p>
-                            <?php if(isset($error_message)):?>
-                               <?php echo $error_message;?>
-                            <?php endif; ?>   
-                        </div>
-                    </form>
-                </div>
-        
-                <div class="info-text login">
-                    <h2 class="animation" style="--i:0; --j:20">Welcome Back!</h2>
-                    <p class="animation" style="--i:1; --j:21"></p>
-                </div>
-        
-        
-        
-        
+<?php include 'navbar.php'; ?>
 
+<div class="auth-container">
+    <div class="auth-card">
+        <?php if (!$showOtpStep): ?>
+            <div class="auth-tabs">
+                <button type="button" class="tab-btn active" id="btn-tab-login" onclick="switchAuth('login')">Login</button>
+                <button type="button" class="tab-btn" id="btn-tab-register" onclick="switchAuth('register')">Sign Up & OTP</button>
+            </div>
+        <?php endif; ?>
 
+        <?php if ($error): ?>
+            <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
 
-        <div class="form-box register">
+        <?php if ($success): ?>
+            <div class="alert-success"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
 
-            <h2 class="title animation" style="--i:17; --j:0">Sign Up</h2>
-
-            <form action="register1.php" method="post">
-
-                <div class="input-box animation" style="--i:18; --j:1">
-                    <input type="text" name="name" required>
-                    <label for="name">Username</label>
-                    <i class='bx bxs-user'></i>
+        <!-- OTP Verification Step -->
+        <?php if ($showOtpStep): ?>
+            <form method="POST">
+                <input type="hidden" name="action" value="verify_otp">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <i class='bx bxs-envelope-open' style="font-size:48px; color:var(--primary-color);"></i>
+                    <h3 style="font-size:22px; color:var(--text-color); margin-top:10px;">Enter 6-Digit OTP</h3>
+                    <p style="font-size:14px; color:var(--text-muted); margin-top:4px;">Check your email for the verification code.</p>
                 </div>
 
-                <div class="input-box animation" style="--i:19; --j:2">
-                    <input type="email" name="email" required>
-                    <label for="email">Email</label>
-                    <i class='bx bxs-envelope'></i>
+                <div class="form-group">
+                    <label>6-Digit Verification Code</label>
+                    <input type="text" name="otp_code" placeholder="e.g. 584920" maxlength="6" style="text-align:center; font-size:24px; letter-spacing:8px; font-weight:700;" required>
                 </div>
 
-                <div class="input-box animation" style="--i:20; --j:3">
-                    <input type="tel" name="phone" required pattern="[0-9]{10}" title="Enter a valid 10-digit phone number">
-                    <label for="phone">Phone Number</label>
-                    <i class='bx bxs-phone'></i>
-                </div>
-
-                <div class="input-box animation" style="--i:20; --j:3">
-                    <input type="password" name="password" required>
-                    <label for="password">Password</label>
-                    <i class='bx bxs-lock-alt'></i>
-                </div>
-
-                <button type="submit" class="btn animation" style="--i:21;--j:4">Sign Up</button>
-
-                <div class="linkTxt animation" style="--i:22; --j:5">
-                    <p>Already have an account? <a href="#" class="login-link">Login</a></p>
-                    <?php if(isset($error_message2)):?>
-                               <?php echo $error_message2;?>
-                            <?php endif; ?>
-                </div>
-
+                <button type="submit" class="btn-auth">Verify OTP & Activate Account →</button>
             </form>
-        </div>
+        <?php else: ?>
+            <!-- Login Form -->
+            <form method="POST" id="form-login">
+                <input type="hidden" name="action" value="login">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" name="email" placeholder="name@domain.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-auth">Login to Account →</button>
+            </form>
 
-        <div class="info-text register">
-            <h2 class="animation" style="--i:17; --j:0;">Welcome</h2>
-            <p class="animation" style="--i:18; --j:1;"></p>
-        </div>
-
+            <!-- Register & Request OTP Form -->
+            <form method="POST" id="form-register" style="display:none;">
+                <input type="hidden" name="action" value="send_otp">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" name="name" placeholder="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" name="email" placeholder="name@domain.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" name="phone" placeholder="9876543210" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-auth">Send 6-Digit OTP Verification Code →</button>
+            </form>
+        <?php endif; ?>
     </div>
+</div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="script.js"></script>
+<script>
+    function switchAuth(type) {
+        if (type === 'login') {
+            document.getElementById('form-login').style.display = 'block';
+            document.getElementById('form-register').style.display = 'none';
+            document.getElementById('btn-tab-login').classList.add('active');
+            document.getElementById('btn-tab-register').classList.remove('active');
+        } else {
+            document.getElementById('form-login').style.display = 'none';
+            document.getElementById('form-register').style.display = 'block';
+            document.getElementById('btn-tab-register').classList.add('active');
+            document.getElementById('btn-tab-login').classList.remove('active');
+        }
+    }
+</script>
 </body>
-
 </html>

@@ -1,355 +1,151 @@
 <?php
-require 'resend.php';
-include 'db.php';
 session_start();
+include 'db.php';
+include 'mailer.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-if (isset($_GET['ride_id'])) {
-    $ride_id = $_GET['ride_id'];
+$ride_id = isset($_GET['ride_id']) ? (int)$_GET['ride_id'] : 0;
+$current_user_id = $_SESSION['user_id'];
+$successMessage = "";
+$errorMessage = "";
 
-    if ($_SERVER["REQUEST_METHOD"] == "POST") {
-        $seats_booked = $_POST['seats_booked'];
+$rideStmt = $conn->prepare("SELECT r.*, u.name as driver_name, u.email as driver_email, u.phone as driver_phone FROM rides r JOIN users u ON r.user_id = u.id WHERE r.id = ?");
+$rideStmt->bind_param("i", $ride_id);
+$rideStmt->execute();
+$ride = $rideStmt->get_result()->fetch_assoc();
 
-        $ride_sql = "SELECT * FROM rides WHERE id = $ride_id";
-        $ride_result = $conn->query($ride_sql);
+if (!$ride) {
+    echo "Ride not found.";
+    exit();
+}
 
-        if ($ride_result->num_rows > 0) {
-            $ride = $ride_result->fetch_assoc();
+$userStmt = $conn->prepare("SELECT email, name, phone FROM users WHERE id = ?");
+$userStmt->bind_param("i", $current_user_id);
+$userStmt->execute();
+$currentUser = $userStmt->get_result()->fetch_assoc();
 
-            $current_user_id = $_SESSION['user_id'];
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $seats_booked = (int)($_POST['seats_booked'] ?? 1);
 
-            $user_sql = "SELECT email, name, phone FROM users WHERE id = $current_user_id";
-            $user_result = $conn->query($user_sql);
+    if ($ride['seats_available'] >= $seats_booked && $seats_booked > 0) {
+        $new_seats = $ride['seats_available'] - $seats_booked;
+        $total_price = $ride['price'] * $seats_booked;
 
-            if ($user_result->num_rows > 0) {
-                $user = $user_result->fetch_assoc();
-                $user_email = $user['email'];
-                $user_name = $user['name'];
-                $user_phone = $user['phone'];
-            } else {
-                echo "User not found.";
-                exit();
-            }
+        $updateStmt = $conn->prepare("UPDATE rides SET seats_available = ? WHERE id = ?");
+        $updateStmt->bind_param("ii", $new_seats, $ride_id);
+        $updateStmt->execute();
 
-            $posted_user_id = $ride['user_id'];
+        // 3NF Safe Booking Insertion
+        safeAddColumn($conn, 'bookings', 'total_price', "DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+        safeAddColumn($conn, 'bookings', 'posted_email', "VARCHAR(150) NULL");
+        safeAddColumn($conn, 'bookings', 'booked_email', "VARCHAR(150) NULL");
 
-            $posted_user_sql = "SELECT email, name, phone FROM users WHERE id = $posted_user_id";
-            $posted_user_result = $conn->query($posted_user_sql);
+        $bookStmt = $conn->prepare("INSERT INTO bookings (user_id, ride_id, seats_booked, total_price, posted_email, booked_email, trip_status) VALUES (?, ?, ?, ?, ?, ?, 'Confirmed')");
+        $bookStmt->bind_param("iiidss", $current_user_id, $ride_id, $seats_booked, $total_price, $ride['driver_email'], $currentUser['email']);
 
-            if ($posted_user_result->num_rows > 0) {
-                $posted_user = $posted_user_result->fetch_assoc();
-                $posted_user_email = $posted_user['email'];
-                $posted_user_name = $posted_user['name'];
-                $posted_user_phone = $posted_user['phone'];
-            } else {
-                echo "Posted user not found.";
-                exit();
-            }
+        if ($bookStmt->execute()) {
+            $booking_id = $bookStmt->insert_id;
 
-            if ($ride['seats_available'] >= $seats_booked) {
+            // Trigger Notification for Driver
+            $n1 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
+            $n1_title = "🎉 New Ride Booking Request!";
+            $n1_msg = "{$currentUser['name']} booked {$seats_booked} seat(s) for your trip from {$ride['origin']} to {$ride['destination']}.";
+            $n1->bind_param("iss", $ride['user_id'], $n1_title, $n1_msg);
+            $n1->execute();
 
-                $new_seats = $ride['seats_available'] - $seats_booked;
+            // Trigger Notification for Passenger
+            $n2 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
+            $n2_title = "✅ Booking Confirmed!";
+            $n2_msg = "Your booking for {$ride['origin']} to {$ride['destination']} with {$ride['driver_name']} is confirmed.";
+            $n2->bind_param("iss", $current_user_id, $n2_title, $n2_msg);
+            $n2->execute();
 
-                $update_sql = "UPDATE rides SET seats_available = $new_seats, posted_email = '$posted_user_email' WHERE id = $ride_id";
-                $conn->query($update_sql);
+            $bookingHtml = "
+                <h2>Booking Confirmed</h2>
+                <p>You have successfully booked <strong>$seats_booked seat(s)</strong> for the trip from <strong>{$ride['origin']}</strong> to <strong>{$ride['destination']}</strong>.</p>
+                <p><strong>Driver:</strong> {$ride['driver_name']} ({$ride['driver_phone']})</p>
+                <p><strong>Date &amp; Time:</strong> {$ride['ride_date']} at {$ride['ride_time']}</p>
+            ";
+            sendResendMail($currentUser['email'], $currentUser['name'], 'FlexiRide - Booking Confirmed!', $bookingHtml);
 
-                $booking_sql = "INSERT INTO bookings (user_id, ride_id, seats_booked, posted_email, booked_email)
-                                VALUES ('$current_user_id', '$ride_id', '$seats_booked', '$posted_user_email', '$user_email')";
-
-                if ($conn->query($booking_sql) === TRUE) {
-
-                    // Email to Ride Owner
-                    $emailBody = "
-                    <h2>Dear {$posted_user_name},</h2>
-
-                    <p>Your ride has been booked successfully on <strong>FlexiRide</strong>.</p>
-
-                    <h3>Booking Details:</h3>
-
-                    <ul>
-                        <li><strong>Booked User Name:</strong> {$user_name}</li>
-                        <li><strong>Booked User Phone Number:</strong> {$user_phone}</li>
-                        <li><strong>Seats Booked:</strong> {$seats_booked}</li>
-                        <li><strong>Seats Remaining:</strong> {$new_seats}</li>
-                    </ul>
-
-                    <p>Please be punctual and have a safe journey.</p>
-
-                    <p>Thank you for using <strong>FlexiRide</strong>.</p>
-
-                    <p>Regards,<br>FlexiRide Team</p>
-                    ";
-
-                    try {
-                        sendResendEmail(
-                            $posted_user_email,
-                            $posted_user_name,
-                            "Your Ride Has Been Booked - FlexiRide",
-                            $emailBody
-                        );
-                    } catch (Exception $e) {
-                        error_log("Resend Error: " . $e->getMessage());
-                    }
-
-                    // Email to Passenger
-                    $emailBody = "
-                    <h2>Dear {$user_name},</h2>
-
-                    <p>Your ride has been booked successfully on <strong>FlexiRide</strong>.</p>
-
-                    <h3>Ride Details:</h3>
-
-                    <ul>
-                        <li><strong>Ride Owner:</strong> {$posted_user_name}</li>
-                        <li><strong>Phone Number:</strong> {$posted_user_phone}</li>
-                        <li><strong>Seats Booked:</strong> {$seats_booked}</li>
-                    </ul>
-
-                    <p>Please be punctual and have a safe journey.</p>
-
-                    <p>If there is an emergency, use the Emergency button in the FlexiRide app.</p>
-
-                    <p>Thank you for using <strong>FlexiRide</strong>.</p>
-
-                    <p>Regards,<br>FlexiRide Team</p>
-                    ";
-
-                    try {
-                        sendResendEmail(
-                            $user_email,
-                            $user_name,
-                            "Ride Booking Confirmation - FlexiRide",
-                            $emailBody
-                        );
-                    } catch (Exception $e) {
-                        error_log("Resend Error: " . $e->getMessage());
-                    }
-
-                    header("Location: booking_success.php?ride_id=$ride_id");
-                    exit();
-
-                } else {
-                    echo "Error: " . $booking_sql . "<br>" . $conn->error;
-                }
-
-            } else {
-                echo "Not enough seats available!";
-            }
-
-        } else {
-            echo "Ride not found.";
+            header("Location: booking_success.php?ride_id=" . $ride_id . "&booking_id=" . $booking_id);
             exit();
+        } else {
+            $errorMessage = "Booking failed: " . $conn->error;
         }
+    } else {
+        $errorMessage = "Requested seats exceed available seat capacity.";
     }
-
-} else {
-    echo "Invalid Ride ID.";
 }
 ?>
-
-
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book a Ride</title>
+    <title>Book Ride - FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
-/* General Body Styling */
-body {
-    font-family: "Josefin Sans", sans-serif;
-    color: black;
-    margin: 0;
-    padding: 0;
-    background-image: url("images/sample-transformed.jpeg");
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-    animation: gradientBackground 15s ease infinite; /* Background animation */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    overflow: hidden;
-}
-
-/* Background Animation */
-@keyframes gradientBackground {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
-
-/* Booking Form Container */
-.book {
-    width: 100%;
-    max-width: 400px;
-    margin: auto;
-    padding: 20px;
-    text-align: center;
-   
-    position: relative;
-    animation: fadeIn 2s ease-out; /* Fade-in effect */
-}
-
-@keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(-20px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
-/* Heading Animation */
-h1 {
-    font-size: 2.5rem;
-    color: white;
-    margin-bottom: 20px;
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
-    animation: pulse 2s infinite;
-}
-
-/* Glowing Heading Animation */
-@keyframes pulse {
-    0%, 100% { text-shadow: 0 0 20px rgba(255, 255, 255, 0.6); }
-    50% { text-shadow: 0 0 30px rgba(255, 255, 255, 0.8); }
-}
-
-/* Form Styling */
-form {
-    backdrop-filter: blur(10px);
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    padding: 20px;
-    animation: slideIn 1.5s ease-out; /* Slide-in effect */
-}
-
-/* Slide-in Animation for the Form */
-@keyframes slideIn {
-    0% { transform: scale(0.9) translateY(20px); opacity: 0; }
-    100% { transform: scale(1) translateY(0); opacity: 1; }
-}
-
-/* Input Fields */
-input[type="number"] {
-    width: calc(100% - 20px);
-    padding: 12px;
-    margin-bottom: 15px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-/* Focus Animation for Input */
-input[type="number"]:focus {
-    border-color: #4a4a8a;
-    box-shadow: 0 0 10px rgba(74, 74, 138, 0.7);
-    transform: scale(1.02);
-    outline: none;
-}
-
-/* Button Styling */
-button[type="submit"] {
-    font-family: "Josefin Sans", sans-serif;
-    background: linear-gradient(135deg, #4a4a8a, #6767b3);
-    color: white;
-    border: none;
-    padding: 15px 25px;
-    border-radius: 10px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 90%;
-    position: relative;
-    overflow: hidden;
-}
-
-button[type="submit"]:hover {
-    background: linear-gradient(135deg, #6767b3, #4a4a8a);
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 5px 20px rgba(74, 74, 138, 0.5);
-}
-
-button[type="submit"]:active {
-    transform: translateY(1px);
-    background: #39396b;
-}
-
-/* Button Ripple Effect */
-button[type="submit"]::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 0;
-    height: 0;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    transition: width 0.5s ease, height 0.5s ease, opacity 0.3s ease;
-    z-index: 1;
-}
-
-button[type="submit"]:hover::after {
-    width: 200%;
-    height: 500%;
-    opacity: 0;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    h1 {
-        font-size: 2rem;
-    }
-
-    form {
-        padding: 15px;
-    }
-
-    button[type="submit"], input[type="number"] {
-        font-size: 1rem;
-    }
-}
-
-@media (max-width: 480px) {
-    h1 {
-        font-size: 1.8rem;
-    }
-
-    form {
-        padding: 10px;
-    }
-
-    button[type="submit"] {
-        font-size: 0.9rem;
-        padding: 10px;
-    }
-
-    input[type="number"] {
-        padding: 10px;
-    }
-}
-
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .tag { display: inline-block; background: var(--success-bg); color: var(--success-color); padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; margin-bottom: 15px; }
+        h2 { font-size: 24px; margin-bottom: 15px; text-align: center; color: var(--text-color); }
+        .info-box { background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; padding: 20px; margin: 20px 0; }
+        .info-box p { margin-bottom: 10px; color: var(--text-muted); font-size: 15px; }
+        .btn-confirm { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary-gradient); color: white; font-weight: 600; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(22, 163, 74, 0.4); }
+        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Sofadi+One&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="book">
-        <h1 style="color:black;">Book rides</h1>
-    <form method="post" action="">
-        <label for="seats_booked">Seats to Book:</label>
-        <input type="number" name="seats_booked" required>
-        <button type="submit">Book Ride</button>
-    </form>
-    <div class="error"></div>
+
+<?php include 'navbar.php'; ?>
+
+<div class="card">
+    <div style="text-align: center;">
+        <span class="tag">🏍️ <?php echo strtoupper($ride['vehicle_category'] ?? 'BIKE'); ?> RIDE</span>
     </div>
+    <h2>Book Your Seat</h2>
+
+    <?php if ($errorMessage): ?>
+        <div class="alert-error"><?php echo htmlspecialchars($errorMessage); ?></div>
+    <?php endif; ?>
+
+    <div class="info-box">
+        <p><strong>Driver:</strong> <?php echo htmlspecialchars($ride['driver_name']); ?></p>
+        <p><strong>Route:</strong> <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></p>
+        <p><strong>Date & Time:</strong> <?php echo htmlspecialchars($ride['ride_date']); ?> at <?php echo htmlspecialchars($ride['ride_time']); ?></p>
+        <p><strong>Vehicle:</strong> <?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_type']); ?></p>
+        <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
+            <p><strong>Spare Helmet:</strong> <?php echo ($ride['helmet_provided'] ?? 1) ? '🪖 Provided' : 'Bring Own'; ?></p>
+        <?php endif; ?>
+        <p><strong>Price per Seat:</strong> <span style="color:var(--success-color); font-weight:700; font-size:18px;">₹<?php echo htmlspecialchars($ride['price']); ?></span></p>
+    </div>
+
+    <form method="POST">
+        <div style="margin-bottom: 20px;">
+            <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select Seats to Book</label>
+            <input type="number" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" style="width:100%; padding:14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:16px; outline:none;" required>
+        </div>
+        <button type="submit" class="btn-confirm">Confirm Seat Booking Now</button>
+    </form>
+</div>
+
 </body>
-</html>  
+</html>
