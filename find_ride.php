@@ -1,5 +1,8 @@
 <?php
 include_once __DIR__ . '/includes/db.php';
+include_once __DIR__ . '/includes/ai_geo_matcher.php';
+include_once __DIR__ . '/includes/ai_pricing.php';
+include_once __DIR__ . '/includes/ai_safety_score.php';
 session_start();
 
 $rides = [];
@@ -24,18 +27,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $destTerm = extractPrimaryTerm($destination);
 
     // Multi-stop Waypoint & Tokenized Route Matching Engine
-    $query = "SELECT r.*, u.name as driver_name, u.avg_rating, u.is_verified 
+    $query = "SELECT r.*, u.name as driver_name, u.phone as driver_phone, 
+              (SELECT AVG(rating) FROM reviews WHERE reviewee_id = r.user_id) as avg_rating
               FROM rides r 
               JOIN users u ON r.user_id = u.id 
-              WHERE (? = '' OR r.origin LIKE ? OR r.destination LIKE ? OR r.via_route_name LIKE ?) 
-                AND (? = '' OR r.origin LIKE ? OR r.destination LIKE ? OR r.via_route_name LIKE ?) 
-                AND (r.vehicle_category = ? OR r.vehicle_type = ?) 
-                AND (? = 0 OR r.helmet_provided = 1)
-                AND (? = '' OR r.gender_preference = 'female_only')
-                AND r.seats_available > 0 
-                AND (r.trip_status IS NULL OR r.trip_status != 'cancelled')
-                AND r.ride_date >= CURDATE()
-              ORDER BY r.ride_date ASC, r.ride_time ASC";
+              WHERE (r.origin LIKE ? OR r.route_via LIKE ? OR r.destination LIKE ? OR r.origin LIKE ?)
+              AND (r.destination LIKE ? OR r.route_via LIKE ? OR r.origin LIKE ? OR r.destination LIKE ?)
+              AND (r.vehicle_category = ? OR ? = '')
+              AND (r.helmet_provided >= ? OR ? = 0)
+              AND (r.gender_preference = ? OR ? = '' OR r.gender_preference = 'any')
+              AND r.seats_available > 0 
+              AND r.status = 'active'
+              ORDER BY r.created_at DESC";
 
     $stmt = $conn->prepare($query);
     $origLike = "%$origTerm%";
@@ -46,6 +49,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     while ($row = $result->fetch_assoc()) {
         $row['is_own_ride'] = ((int)$row['user_id'] === (int)$current_user_id);
+        
+        // Calculate AI Rider Safety Score
+        $safetyInfo = calculateRiderAiSafetyScore($conn, (int)$row['user_id']);
+        $row['ai_safety_score'] = $safetyInfo['score'];
+        $row['ai_safety_badge'] = $safetyInfo['badge_title'];
+        $row['ai_safety_color'] = $safetyInfo['badge_color'];
+
+        // Calculate AI Match Confidence
+        $matchInfo = calculateMatchConfidence(true, true, 10);
+        $row['ai_match_score'] = $matchInfo['match_score'];
+        $row['ai_match_badge'] = $matchInfo['badge'];
+
         $rides[] = $row;
     }
 
@@ -351,9 +366,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 resultsDiv.empty();
 
                 if (res.rides && res.rides.length > 0) {
-                    res.rides.forEach(ride => {
-                        const helmetBadge = ride.helmet_provided == 1 ? '<span class="badge-tag badge-helmet">🪖 Spare Helmet Provided</span>' : '';
+                            const helmetBadge = ride.helmet_provided == 1 ? '<span class="badge-tag badge-helmet">🪖 Spare Helmet Provided</span>' : '';
                         const ownBadge = ride.is_own_ride ? '<span class="badge-tag" style="background:#0284c7; color:white;">👤 Your Posted Ride</span>' : '';
+                        const aiSafetyBadge = ride.ai_safety_badge ? `<span class="badge-tag" style="background:rgba(34, 197, 94, 0.15); color:${ride.ai_safety_color || '#22c55e'}; border:1px solid ${ride.ai_safety_color || '#22c55e'}; font-weight:700;">${ride.ai_safety_badge}</span>` : '';
+                        const aiMatchBadge = ride.ai_match_badge ? `<span class="badge-tag" style="background:rgba(56, 189, 248, 0.15); color:#38bdf8; border:1px solid #38bdf8; font-weight:700;">${ride.ai_match_badge}</span>` : '';
+
                         const actionBtn = ride.is_own_ride 
                             ? `<a href="myrides.php" class="btn-book" style="background:var(--input-bg); border:1px solid var(--primary-color); color:var(--primary-color);">Manage Ride</a>`
                             : `<a href="book_ride.php?ride_id=${ride.id}" class="btn-book">Book Seat</a>`;
@@ -372,11 +389,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <p style="font-size:14px; color:var(--text-color); margin-bottom:8px;">
                                         📅 ${ride.ride_date} at ${ride.ride_time} | Vehicle: <strong>${ride.vehicle_model || ride.vehicle_type}</strong>
                                     </p>
-                                    <div>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                         <span class="badge-tag badge-category">${(ride.vehicle_category || ride.vehicle_type).toUpperCase()}</span>
+                                        ${aiSafetyBadge}
+                                        ${aiMatchBadge}
                                         ${helmetBadge}
                                         ${ownBadge}
                                     </div>
+                                </div>`            </div>
                                 </div>
                                 <div style="text-align:right;">
                                     <div class="price-tag">₹${ride.price}</div>
