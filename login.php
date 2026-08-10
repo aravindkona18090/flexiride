@@ -50,8 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $showOtpStep = true;
                 $success = "6-Digit Verification OTP sent to {$email}!";
             } else {
-                global $lastResendError;
-                $error = "Email Delivery Failed: " . ($lastResendError ?: "Please verify your Resend API Key.");
+                $error = "Email Delivery Failed: " . getLastMailerError();
             }
         }
     } elseif ($action === 'verify_otp') {
