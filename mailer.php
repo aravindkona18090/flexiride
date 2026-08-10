@@ -10,7 +10,7 @@
 // OPTIONAL: Paste your API Key directly below if not using environment variables
 define('CONFIG_BREVO_API_KEY', '');   // e.g. 'xkeysib-...'
 define('CONFIG_RESEND_API_KEY', '');  // e.g. 're_...'
-define('CONFIG_SENDER_EMAIL', 'flexiride247@gmail.com');
+define('CONFIG_SENDER_EMAIL', 'aravindkona18090@gmail.com');
 
 $GLOBALS['lastMailerError'] = '';
 
@@ -22,7 +22,7 @@ function sendResendMail(string $toEmail, string $toName, string $subject, string
     $resendKey = getenv('RESEND_API_KEY') ?: (defined('CONFIG_RESEND_API_KEY') ? CONFIG_RESEND_API_KEY : '');
 
     // Sender email address
-    $senderEmail = getenv('SENDER_EMAIL') ?: (getenv('RESEND_FROM_EMAIL') ?: (defined('CONFIG_SENDER_EMAIL') ? CONFIG_SENDER_EMAIL : 'flexiride247@gmail.com'));
+    $senderEmail = getenv('SENDER_EMAIL') ?: (getenv('RESEND_FROM_EMAIL') ?: (defined('CONFIG_SENDER_EMAIL') ? CONFIG_SENDER_EMAIL : 'aravindkona18090@gmail.com'));
     $senderName  = 'FlexiRide';
 
     // ------------------------------------------------------------
