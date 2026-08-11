@@ -37,18 +37,24 @@ if ($result->num_rows > 0) {
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
         body {
-            background: #0f172a;
-            color: #f8fafc;
+            background: var(--bg-color) !important;
+            color: var(--text-color) !important;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 40px 20px;
+            width: 100%;
         }
         .card {
-            background: rgba(30, 41, 59, 0.85);
+            background: var(--card-bg);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--card-border);
             border-radius: 20px;
             padding: 40px;
             max-width: 500px;
@@ -58,18 +64,21 @@ if ($result->num_rows > 0) {
         }
         .check-icon { font-size: 64px; color: #22c55e; margin-bottom: 15px; }
         h2 { font-size: 26px; color: #f8fafc; margin-bottom: 10px; }
-        .details-box { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; text-align: left; margin: 20px 0; }
-        .details-box p { margin-bottom: 8px; color: #cbd5e1; font-size: 15px; }
+        .details-box { background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; padding: 20px; text-align: left; margin: 20px 0; }
+        .details-box p { margin-bottom: 8px; color: var(--text-muted); font-size: 15px; }
         .btn-group { display: flex; gap: 15px; }
         .btn { flex: 1; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 15px; text-align: center; transition: 0.3s; }
-        .btn-chat { background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); color: white; }
-        .btn-home { background: #334155; color: white; }
+        .btn-chat { background: var(--primary-gradient); color: white; }
+        .btn-home { background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); }
         .btn:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body>
 
-<div class="card">
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
+
+<div class="container">
+    <div class="card">
     <i class='bx bxs-check-circle check-icon'></i>
     <h2>Booking Confirmed!</h2>
     <p style="color:#94a3b8; font-size:14px;">Your seat has been reserved successfully.</p>
@@ -91,6 +100,6 @@ if ($result->num_rows > 0) {
         <a href="index.php" class="btn btn-home">Return Home</a>
     </div>
 </div>
-
+</div>
 </body>
 </html>

@@ -124,6 +124,7 @@ $my_rides = $stmt->get_result();
         <div style="display:flex; gap:8px;">
             <button type="button" class="filter-btn active" onclick="setFilter('all', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--primary-color); background:var(--primary-color); color:white; font-size:13px; font-weight:600; cursor:pointer;">All Trips</button>
             <button type="button" class="filter-btn" onclick="setFilter('active', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer;">Active</button>
+            <button type="button" class="filter-btn" onclick="setFilter('completed', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer;">Completed</button>
             <button type="button" class="filter-btn" onclick="setFilter('cancelled', this)" style="padding:8px 14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer;">Cancelled</button>
         </div>
     </div>
@@ -160,12 +161,26 @@ $my_rides = $stmt->get_result();
                           "💺 Available Seats: " . ($ride['seats_available'] - $ride['booked_count']) . "\n" .
                           "📍 Pickup Location Map: " . $mapsUrl;
                 $waUrl = "https://api.whatsapp.com/send?text=" . urlencode($waText);
+
+                // Compute dynamic ride completion status based on date & time
+                $rideDateTime = strtotime($ride['ride_date'] . ' ' . $ride['ride_time']);
+                $isPassed = ($rideDateTime < time());
+                $rawStatus = strtolower($ride['trip_status'] ?? 'active');
+                if ($rawStatus === 'cancelled') {
+                    $computedStatus = 'cancelled';
+                } elseif ($isPassed || $rawStatus === 'completed') {
+                    $computedStatus = 'completed';
+                } else {
+                    $computedStatus = 'active';
+                }
             ?>
-            <div class="ride-card">
+            <div class="ride-card" data-status="<?php echo $computedStatus; ?>">
                 <div>
                     <div style="margin-bottom:8px;">
-                        <?php if (($ride['trip_status'] ?? 'active') === 'cancelled'): ?>
+                        <?php if ($computedStatus === 'cancelled'): ?>
                             <span class="status-badge status-cancelled"><i class='bx bxs-x-circle'></i> Status: Cancelled</span>
+                        <?php elseif ($computedStatus === 'completed'): ?>
+                            <span class="status-badge" style="background:rgba(148, 163, 184, 0.15); color:#94a3b8; border:1px solid #64748b;"><i class='bx bxs-time-five'></i> Status: Completed</span>
                         <?php else: ?>
                             <span class="status-badge status-active"><i class='bx bxs-check-circle'></i> Status: Active</span>
                         <?php endif; ?>

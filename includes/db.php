@@ -27,9 +27,9 @@ safeAddColumn($conn, 'users', 'profile_photo', "VARCHAR(255) NULL");
 safeAddColumn($conn, 'vehicles', 'total_seats', "INT NOT NULL DEFAULT 5");
 safeAddColumn($conn, 'rides', 'route_distance', "DECIMAL(8,2) NOT NULL DEFAULT 25.00");
 safeAddColumn($conn, 'rides', 'trip_status', "VARCHAR(50) NOT NULL DEFAULT 'active'");
-safeAddColumn($conn, 'bookings', 'total_price', "DECIMAL(10,2) NOT NULL DEFAULT 0.00");
-safeAddColumn($conn, 'bookings', 'posted_email', "VARCHAR(150) NULL");
-safeAddColumn($conn, 'bookings', 'booked_email', "VARCHAR(150) NULL");
+// Dynamic Real-Time Status Engine: Auto-mark passed rides & bookings as 'Completed'
+$conn->query("UPDATE bookings b JOIN rides r ON b.ride_id = r.id SET b.trip_status = 'Completed' WHERE b.trip_status IN ('Confirmed', 'OnTheWay') AND CONCAT(r.ride_date, ' ', r.ride_time) < NOW()");
+$conn->query("UPDATE rides SET trip_status = 'Completed' WHERE (trip_status IS NULL OR trip_status = '' OR trip_status = 'active') AND CONCAT(ride_date, ' ', ride_time) < NOW()");
 
 // 3NF Relation Sync Helper
 function syncUser3NF($conn, $user_id, $aadhaar, $is_aadhaar, $dl, $is_dl, $college, $is_college, $campus, $upi, $is_upi, $is_verified, $em1, $em2, $em_phone) {

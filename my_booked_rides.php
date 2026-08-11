@@ -193,11 +193,32 @@ $result = $stmt->get_result();
                     ? "https://api.whatsapp.com/send?phone=" . $emPhone . "&text=" . urlencode($sosText)
                     : "https://api.whatsapp.com/send?text=" . urlencode($sosText);
             ?>
-            <div class="ride-card">
+            <?php
+                $rideDateTime = strtotime($ride['ride_date'] . ' ' . $ride['ride_time']);
+                $isPassed = ($rideDateTime < time());
+                $rawStatus = strtolower($ride['trip_status'] ?? 'confirmed');
+                if ($rawStatus === 'cancelled') {
+                    $computedStatus = 'cancelled';
+                    $badgeStyle = 'status-cancelled';
+                    $statusIcon = 'bx bxs-x-circle';
+                    $statusLabel = 'Cancelled';
+                } elseif ($isPassed || $rawStatus === 'completed') {
+                    $computedStatus = 'completed';
+                    $badgeStyle = '';
+                    $statusIcon = 'bx bxs-time-five';
+                    $statusLabel = 'Completed';
+                } else {
+                    $computedStatus = 'active';
+                    $badgeStyle = 'status-confirmed';
+                    $statusIcon = 'bx bxs-check-circle';
+                    $statusLabel = 'Confirmed';
+                }
+            ?>
+            <div class="ride-card" data-status="<?php echo $computedStatus; ?>">
                 <div>
                     <div style="margin-bottom:8px;">
-                        <span class="status-badge status-confirmed">
-                            <i class='bx bxs-check-circle'></i> Status: <?php echo htmlspecialchars($ride['trip_status']); ?>
+                        <span class="status-badge <?php echo $badgeStyle; ?>" <?php if ($computedStatus === 'completed') echo 'style="background:rgba(148, 163, 184, 0.15); color:#94a3b8; border:1px solid #64748b;"'; ?>>
+                            <i class='bx <?php echo $statusIcon; ?>'></i> Status: <?php echo $statusLabel; ?>
                         </span>
                     </div>
                     <h3 style="font-size:20px; margin-bottom:6px;"><?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></h3>
