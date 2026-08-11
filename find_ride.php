@@ -12,27 +12,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $female_filter    = trim($_POST['female_filter'] ?? '');
     $current_user_id  = $_SESSION['user_id'] ?? 0;
 
+    // Helper to extract primary search keyword token (e.g. "Doddaballapura" from multi-word address strings)
+    function extractPrimaryTerm($str) {
+        if (empty($str)) return '';
+        $parts = explode(',', $str);
+        $clean = trim($parts[0]);
+        return !empty($clean) ? $clean : trim($str);
+    }
+
+    $origTerm = extractPrimaryTerm($origin);
+    $destTerm = extractPrimaryTerm($destination);
+
+    // Multi-stop Waypoint & Tokenized Route Matching Engine
     $query = "SELECT r.*, u.name as driver_name, u.avg_rating, u.is_verified 
               FROM rides r 
               JOIN users u ON r.user_id = u.id 
-              WHERE (r.origin LIKE ? OR r.destination LIKE ? OR ? = '' OR ? = '') 
+              WHERE (? = '' OR r.origin LIKE ? OR r.destination LIKE ? OR r.via_route_name LIKE ?) 
+                AND (? = '' OR r.origin LIKE ? OR r.destination LIKE ? OR r.via_route_name LIKE ?) 
                 AND (r.vehicle_category = ? OR r.vehicle_type = ?) 
                 AND (? = 0 OR r.helmet_provided = 1)
                 AND (? = '' OR r.gender_preference = 'female_only')
-                AND r.user_id != ? 
                 AND r.seats_available > 0 
                 AND (r.trip_status IS NULL OR r.trip_status != 'cancelled')
                 AND r.ride_date >= CURDATE()
               ORDER BY r.ride_date ASC, r.ride_time ASC";
 
     $stmt = $conn->prepare($query);
-    $origLike = "%$origin%";
-    $destLike = "%$destination%";
-    $stmt->bind_param("ssssssisi", $origLike, $destLike, $origin, $destination, $vehicle_category, $vehicle_category, $helmet_filter, $female_filter, $current_user_id);
+    $origLike = "%$origTerm%";
+    $destLike = "%$destTerm%";
+    $stmt->bind_param("ssssssssssis", $origTerm, $origLike, $origLike, $origLike, $destTerm, $destLike, $destLike, $destLike, $vehicle_category, $vehicle_category, $helmet_filter, $female_filter);
     $stmt->execute();
     $result = $stmt->get_result();
 
     while ($row = $result->fetch_assoc()) {
+        $row['is_own_ride'] = ((int)$row['user_id'] === (int)$current_user_id);
         $rides[] = $row;
     }
 
@@ -244,6 +257,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     let originMarker = null;
     let destMarker = null;
 
+    function cleanShortAddress(displayName) {
+        if (!displayName) return '';
+        const parts = displayName.split(',').map(s => s.trim());
+        if (parts.length <= 2) return displayName;
+        return `${parts[0]}, ${parts[1]}`;
+    }
+
     map.on('click', function(e) {
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -252,24 +272,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             setOriginPin(lat, lng, `GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
             fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
                 .then(r => r.json())
-                .then(data => { if(data.display_name) document.getElementById('origin').value = data.display_name; });
+                .then(data => { if(data.display_name) document.getElementById('origin').value = cleanShortAddress(data.display_name); });
         } else if (!destMarker) {
             setDestPin(lat, lng, `GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
             fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
                 .then(r => r.json())
-                .then(data => { if(data.display_name) document.getElementById('destination').value = data.display_name; });
+                .then(data => { if(data.display_name) document.getElementById('destination').value = cleanShortAddress(data.display_name); });
             $('#searchForm').submit();
         }
     });
 
     function setOriginPin(lat, lng, name) {
         if (originMarker) map.removeLayer(originMarker);
-        originMarker = L.marker([lat, lng]).addTo(map).bindPopup(`📍 Pickup: ${name}`).openPopup();
+        originMarker = L.marker([lat, lng]).addTo(map).bindPopup(`📍 Pickup: ${cleanShortAddress(name)}`).openPopup();
     }
 
     function setDestPin(lat, lng, name) {
         if (destMarker) map.removeLayer(destMarker);
-        destMarker = L.marker([lat, lng]).addTo(map).bindPopup(`🏁 Drop: ${name}`).openPopup();
+        destMarker = L.marker([lat, lng]).addTo(map).bindPopup(`🏁 Drop: ${cleanShortAddress(name)}`).openPopup();
     }
 
     function setupAutocomplete(inputId, suggestionsId, setPinFunc) {
@@ -289,16 +309,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         if (results.length > 0) {
                             suggList.style.display = 'block';
                             results.slice(0, 5).forEach(item => {
+                                const cleanName = cleanShortAddress(item.display_name);
                                 const div = document.createElement('div');
                                 div.className = 'suggestion-item';
-                                div.textContent = item.display_name;
+                                div.textContent = cleanName;
                                 div.onclick = function() {
-                                    input.value = item.display_name;
+                                    input.value = cleanName;
                                     suggList.style.display = 'none';
                                     const lat = parseFloat(item.lat);
                                     const lon = parseFloat(item.lon);
                                     map.setView([lat, lon], 13);
-                                    setPinFunc(lat, lon, item.display_name);
+                                    setPinFunc(lat, lon, cleanName);
                                     $('#searchForm').submit();
                                 };
                                 suggList.appendChild(div);
@@ -321,6 +342,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             const helmet_filter = $('#helmet_filter').val();
             const female_filter = $('#female_filter').val();
 
+            const searchBtn = $(this).find('button[type="submit"]');
+            const originalBtnHtml = searchBtn.html();
+            searchBtn.css('pointer-events', 'none').css('opacity', '0.85').html(`<i class='bx bx-loader-alt bx-spin' style='font-size:18px; vertical-align:middle; margin-right:6px;'></i> Searching...`);
+
             $.post('find_ride.php', { origin, destination, vehicle_category, helmet_filter, female_filter }, function(res) {
                 const resultsDiv = $('#results');
                 resultsDiv.empty();
@@ -328,13 +353,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 if (res.rides && res.rides.length > 0) {
                     res.rides.forEach(ride => {
                         const helmetBadge = ride.helmet_provided == 1 ? '<span class="badge-tag badge-helmet">🪖 Spare Helmet Provided</span>' : '';
+                        const ownBadge = ride.is_own_ride ? '<span class="badge-tag" style="background:#0284c7; color:white;">👤 Your Posted Ride</span>' : '';
+                        const actionBtn = ride.is_own_ride 
+                            ? `<a href="myrides.php" class="btn-book" style="background:var(--input-bg); border:1px solid var(--primary-color); color:var(--primary-color);">Manage Ride</a>`
+                            : `<a href="book_ride.php?ride_id=${ride.id}" class="btn-book">Book Seat</a>`;
+
                         const card = `
                             <div class="ride-card">
                                 <div>
                                     <div class="driver-info">
                                         <div class="driver-avatar"><i class='bx bxs-user'></i></div>
                                         <div>
-                                            <strong>${ride.driver_name}</strong>
+                                            <strong>${ride.driver_name} ${ride.is_own_ride ? '(You)' : ''}</strong>
                                             <div style="font-size:13px; color:var(--text-muted);">⭐ ${ride.avg_rating || '5.0'} Rating</div>
                                         </div>
                                     </div>
@@ -345,12 +375,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <div>
                                         <span class="badge-tag badge-category">${(ride.vehicle_category || ride.vehicle_type).toUpperCase()}</span>
                                         ${helmetBadge}
+                                        ${ownBadge}
                                     </div>
                                 </div>
                                 <div style="text-align:right;">
                                     <div class="price-tag">₹${ride.price}</div>
                                     <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">${ride.seats_available} seat left</div>
-                                    <a href="book_ride.php?ride_id=${ride.id}" class="btn-book">Book Seat</a>
+                                    ${actionBtn}
                                 </div>
                             </div>
                         `;
@@ -359,7 +390,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 } else {
                     resultsDiv.html('<div style="text-align:center; padding:30px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:16px;">No matching rides found along this route. Be the first to post a ride!</div>');
                 }
-            }, 'json');
+            }, 'json').always(function() {
+                searchBtn.css('pointer-events', 'auto').css('opacity', '1').html(originalBtnHtml);
+            });
         });
         
         $('#searchForm').submit();

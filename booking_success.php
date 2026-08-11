@@ -63,7 +63,7 @@ if ($result->num_rows > 0) {
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
         .check-icon { font-size: 64px; color: #22c55e; margin-bottom: 15px; }
-        h2 { font-size: 26px; color: #f8fafc; margin-bottom: 10px; }
+        h2 { font-size: 26px; color: var(--text-color) !important; margin-bottom: 10px; }
         .details-box { background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; padding: 20px; text-align: left; margin: 20px 0; }
         .details-box p { margin-bottom: 8px; color: var(--text-muted); font-size: 15px; }
         .btn-group { display: flex; gap: 15px; }
@@ -81,7 +81,7 @@ if ($result->num_rows > 0) {
     <div class="card">
     <i class='bx bxs-check-circle check-icon'></i>
     <h2>Booking Confirmed!</h2>
-    <p style="color:#94a3b8; font-size:14px;">Your seat has been reserved successfully.</p>
+    <p style="color:var(--text-muted); font-size:14px;">Your seat has been reserved successfully.</p>
 
     <div class="details-box">
         <p><strong><i class='bx bxs-map-pin'></i> Route:</strong> <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></p>

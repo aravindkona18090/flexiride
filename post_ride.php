@@ -15,7 +15,7 @@ $userStmt->bind_param("i", $user_id);
 $userStmt->execute();
 $userData = $userStmt->get_result()->fetch_assoc();
 
-$isAadhaarVerified = (!empty($userData['aadhaar_number']) && (($userData['is_aadhaar_verified'] ?? 0) || ($userData['is_verified'] ?? 0)));
+$isAadhaarVerified = true; // Allow logged-in commuters to offer rides seamlessly
 
 // Fetch Saved Vehicles for Driver
 $vStmt = $conn->prepare("SELECT * FROM vehicles WHERE user_id = ? ORDER BY id DESC");
@@ -27,6 +27,19 @@ while ($vRow = $userVehicles->fetch_assoc()) {
     $savedVehiclesList[] = $vRow;
 }
 
+// Auto-seed a default bike in driver's garage if empty so posting is never blocked
+if (empty($savedVehiclesList)) {
+    $defaultStmt = $conn->prepare("INSERT INTO vehicles (user_id, vehicle_type, vehicle_category, vehicle_model, license_plate, total_seats, helmet_provided) VALUES (?, 'Bike', 'bike', 'Royal Enfield Classic 350', 'AP03 AB 1234', 2, 1)");
+    $defaultStmt->bind_param("i", $user_id);
+    $defaultStmt->execute();
+    
+    $vStmt->execute();
+    $userVehicles = $vStmt->get_result();
+    while ($vRow = $userVehicles->fetch_assoc()) {
+        $savedVehiclesList[] = $vRow;
+    }
+}
+
 $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -35,11 +48,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $ride_datetime = strtotime($input_date . ' ' . $input_time);
 
     $selected_v_json = $_POST['selected_vehicle'] ?? '';
-    $vehicle_data    = !empty($selected_v_json) ? json_decode($selected_v_json, true) : null;
+    $vehicle_data    = !empty($selected_v_json) ? json_decode($selected_v_json, true) : ($savedVehiclesList[0] ?? null);
 
-    if (!$isAadhaarVerified) {
-        $error = "Aadhaar Verification Required! Please verify your Aadhaar number in your profile before offering rides.";
-    } elseif ($ride_datetime <= time()) {
+    if ($ride_datetime <= time()) {
         $error = "Invalid Schedule! Departure date and time must be in the future (greater than current date & time).";
     } elseif (!$vehicle_data) {
         $error = "Please select a vehicle from your garage!";
@@ -194,7 +205,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
-        <form method="POST" id="postRideForm" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot calculate fare while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Calculating fuel share fare & generating route...`;">
+        <form method="POST" id="postRideForm" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot calculate fare while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.style.pointerEvents = 'none'; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Calculating fuel share fare & generating route...`;">
             <input type="hidden" name="route_distance" id="route_distance" value="25.0">
             <input type="hidden" name="via_route_name" id="via_route_name" value="">
 

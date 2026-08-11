@@ -275,6 +275,7 @@ if (isset($_SESSION['user_id'])) {
             <li><a href="<?php echo $navRel; ?>index.php">🏠 Home</a></li>
             <li><a href="<?php echo $navRel; ?>find_ride.php">Find Ride</a></li>
             <li><a href="<?php echo $navRel; ?>post_ride.php">Offer Ride</a></li>
+            <li><a href="<?php echo $navRel; ?>about.php">About</a></li>
         <?php endif; ?>
 
         <?php if (isset($_SESSION['user_id'])): ?>

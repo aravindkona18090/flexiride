@@ -147,7 +147,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <p><strong>Price per Seat:</strong> <span style="color:var(--success-color); font-weight:700; font-size:18px;">₹<?php echo htmlspecialchars($ride['price']); ?></span></p>
         </div>
 
-        <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot book while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Securing seat & notifying driver...`;">
+        <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot book while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.style.pointerEvents = 'none'; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Securing seat & notifying driver...`;">
             <div style="margin-bottom: 20px;">
                 <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select Seats to Book</label>
                 <input type="number" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" style="width:100%; padding:14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:16px; outline:none;" required>
