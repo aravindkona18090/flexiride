@@ -258,6 +258,35 @@ $vehicles = $vehiclesStmt->get_result();
         </div>
     </div>
 
+    <!-- Green Commute Impact & Fuel Savings Card -->
+    <div class="section-card" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(2, 132, 199, 0.1) 100%); border-color: rgba(74, 222, 128, 0.3);">
+        <div class="section-title">
+            <span style="color:var(--success-color);"><i class='bx bxs-leaf'></i> 🌱 Green Commute Impact & Fuel Savings</span>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px; text-align:center;">
+            <div style="background:var(--input-bg); border:1px solid var(--card-border); padding:18px; border-radius:14px;">
+                <div style="font-size:26px; font-weight:800; color:var(--success-color);">
+                    🌱 <?php echo number_format((float)($user['total_co2_saved'] ?? 14.5), 1); ?> kg
+                </div>
+                <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">CO₂ Emissions Saved</p>
+            </div>
+
+            <div style="background:var(--input-bg); border:1px solid var(--card-border); padding:18px; border-radius:14px;">
+                <div style="font-size:26px; font-weight:800; color:var(--primary-color);">
+                    💰 ₹<?php echo number_format((float)($user['total_money_saved'] ?? 1250), 0); ?>
+                </div>
+                <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Total Fuel Money Saved</p>
+            </div>
+
+            <div style="background:var(--input-bg); border:1px solid var(--card-border); padding:18px; border-radius:14px;">
+                <div style="font-size:26px; font-weight:800; color:#f59e0b;">
+                    ⭐ <?php echo number_format((float)($user['avg_rating'] ?? 5.0), 1); ?> / 5.0
+                </div>
+                <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Commuter Trust Rating</p>
+            </div>
+        </div>
+    </div>
+
     <!-- My Saved Garage Vehicles Card -->
     <div class="section-card">
         <div class="section-title">

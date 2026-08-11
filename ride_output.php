@@ -41,6 +41,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_post'])) {
     $final_price = (float)$_POST['final_price'];
 
     safeAddColumn($conn, 'rides', 'route_distance', "DECIMAL(8,2) NOT NULL DEFAULT 25.00");
+    safeAddColumn($conn, 'rides', 'trip_status', "VARCHAR(50) NOT NULL DEFAULT 'active'");
     $stmt = $conn->prepare("INSERT INTO rides (user_id, origin, destination, ride_date, ride_time, vehicle_type, vehicle_category, vehicle_model, seats_available, price, helmet_provided, gender_preference, luggage_limit, route_distance, trip_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')");
     
     $stmt->bind_param("isssssssidsssd", $user_id, $origin, $destination, $ride_date, $ride_time, $vehicle_category, $vehicle_category, $vehicle_model, $seats_available, $final_price, $helmet_provided, $gender_preference, $luggage_limit, $distance_km);

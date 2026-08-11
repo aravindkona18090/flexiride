@@ -27,14 +27,30 @@ if (!$ride) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
     $msg_text = trim($_POST['message']);
-    $receiver_id = ($user_id == $ride['user_id']) ? 0 : $ride['user_id'];
+    
+    // Determine receiver_id from URL parameter or ride relationship
+    $receiver_id = isset($_REQUEST['receiver_id']) ? (int)$_REQUEST['receiver_id'] : 0;
 
-    if (!empty($msg_text)) {
+    if ($receiver_id <= 0) {
+        if ($user_id == $ride['user_id']) {
+            // Driver is messaging -> find the booked passenger for this ride
+            $bStmt = $conn->prepare("SELECT user_id FROM bookings WHERE ride_id = ? AND trip_status != 'Cancelled' LIMIT 1");
+            $bStmt->bind_param("i", $ride_id);
+            $bStmt->execute();
+            $bRes = $bStmt->get_result()->fetch_assoc();
+            $receiver_id = $bRes ? (int)$bRes['user_id'] : 0;
+        } else {
+            // Passenger is messaging -> receiver is the driver
+            $receiver_id = (int)$ride['user_id'];
+        }
+    }
+
+    if (!empty($msg_text) && $receiver_id > 0) {
         $msgStmt = $conn->prepare("INSERT INTO messages (ride_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)");
         $msgStmt->bind_param("iiis", $ride_id, $user_id, $receiver_id, $msg_text);
         $msgStmt->execute();
     }
-    header("Location: chat.php?ride_id=" . $ride_id);
+    header("Location: chat.php?ride_id=" . $ride_id . ($receiver_id > 0 ? "&receiver_id=" . $receiver_id : ""));
     exit();
 }
 
