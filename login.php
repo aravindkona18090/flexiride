@@ -80,6 +80,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $email    = trim($_POST['email']);
         $password = $_POST['password'];
 
+        $adminEmail = getenv('ADMIN_EMAIL') ?: 'admin@flexiride.com';
+        $adminPass  = getenv('ADMIN_PASS')  ?: 'Admin@123';
+
+        // Check if log in is for Admin Dashboard
+        if ($email === $adminEmail && $password === $adminPass) {
+            $_SESSION['is_admin'] = true;
+            $_SESSION['user_id']  = 9999;
+            $_SESSION['name']     = 'System Admin';
+            header("Location: admin_dashboard.php");
+            exit();
+        }
+
         $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
@@ -88,6 +100,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['name']    = $user['name'];
+            
+            // Check if user account has admin privileges
+            if (($user['email'] ?? '') === $adminEmail) {
+                $_SESSION['is_admin'] = true;
+            }
+            
             header("Location: index.php");
             exit();
         } else {
