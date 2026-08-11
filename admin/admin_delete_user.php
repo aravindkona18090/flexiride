@@ -1,10 +1,10 @@
 <?php
-include 'db.php';  // Include database connection
+include_once __DIR__ . '/../includes/db.php';  // Include database connection
 session_start();
 
 // Ensure the user is an admin
 if (!isset($_GET['id'])) {
-    header("Location: login.php");
+    header('Location: ../login.php');
     exit();
 }
 

@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
@@ -192,7 +192,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="container">
     <div class="header-bar">

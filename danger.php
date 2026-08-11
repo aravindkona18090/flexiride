@@ -1,7 +1,7 @@
 <?php
 session_start();
-include 'db.php';
-include 'mailer.php';
+include_once __DIR__ . '/includes/db.php';
+include_once __DIR__ . '/includes/mailer.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");

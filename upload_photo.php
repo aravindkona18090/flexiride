@@ -1,5 +1,5 @@
 <?php
-include 'db.php'; // Ensure this file has $conn connection
+include_once __DIR__ . '/includes/db.php'; // Ensure this file has $conn connection
 
 // Handle upload
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['photo'])) {

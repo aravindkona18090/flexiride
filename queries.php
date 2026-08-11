@@ -1,37 +1,39 @@
 <?php
 session_start();
+include_once __DIR__ . '/includes/db.php';
 
-// Initialize variables for form data and success message
 $name = $email = $query = "";
 $successMessage = "";
+$errorMessage = "";
 
-// Check if the form has been submitted
+// Auto-fill logged in user info
+if (isset($_SESSION['user_id'])) {
+    $u_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+    $u_stmt->bind_param("i", $_SESSION['user_id']);
+    $u_stmt->execute();
+    $u_res = $u_stmt->get_result()->fetch_assoc();
+    if ($u_res) {
+        $name = $u_res['name'];
+        $email = $u_res['email'];
+    }
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Sanitize and validate form data
     $name = isset($_POST['name']) ? htmlspecialchars(trim($_POST['name'])) : '';
     $email = isset($_POST['email']) ? htmlspecialchars(trim($_POST['email'])) : '';
     $query = isset($_POST['query']) ? htmlspecialchars(trim($_POST['query'])) : '';
 
-    // Simple validation
     if (!empty($name) && !empty($email) && !empty($query)) {
-        // Connect to the database (ensure the database connection file is correct)
-        include "db.php"; // Replace with your database connection file
-
-        // Insert query into the database
         $stmt = $conn->prepare("INSERT INTO queries (name, email, query) VALUES (?, ?, ?)");
         $stmt->bind_param("sss", $name, $email, $query);
 
         if ($stmt->execute()) {
-            $successMessage = "Thank you, $name! Your query has been submitted successfully.";
+            $successMessage = "Thank you, $name! Your query has been submitted successfully to FlexiRide support.";
         } else {
-            $successMessage = "An error occurred. Please try again.";
+            $errorMessage = "An error occurred while submitting your query. Please try again.";
         }
-
-        // Close statement and connection
-        $stmt->close();
-        $conn->close();
     } else {
-        $successMessage = "Please fill in all fields.";
+        $errorMessage = "Please fill in all fields.";
     }
 }
 ?>
@@ -41,122 +43,86 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Sofadi+One&display=swap" rel="stylesheet">
-    <title>Queries - FlexiRide</title>
+    <title>Submit Support Query - FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
-        .back-home-btn {
-            display: inline-block;
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            padding: 10px 20px;
-            font-size: 1rem;
-            font-weight: bold;
-            color: #fff;
-            background-color: #3498db;
-            text-decoration: none;
-            border-radius: 5px;
-            text-align: center;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
+
+        .container { max-width: 650px; margin: 40px auto; padding: 0 20px; width: 100%; }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 35px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         }
 
-        .back-home-btn:hover {
-            background-color: #2c3e50;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        .card h2 { font-size: 24px; color: var(--text-color); margin-bottom: 8px; text-align: center; }
+        .card p { font-size: 14px; color: var(--text-muted); text-align: center; margin-bottom: 25px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: var(--text-color); margin-bottom: 8px; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--input-border);
+            background: var(--input-bg); color: var(--text-color); outline: none; font-size: 15px;
         }
 
-        body {
-            font-family: "Josefin Sans", sans-serif;
-            background-color: #ffffff;
-            margin: 0;
-            padding: 0;
+        .btn-submit {
+            width: 100%; padding: 16px; border: none; border-radius: 12px;
+            background: var(--primary-gradient); color: white; font-size: 16px; font-weight: 700;
+            cursor: pointer; transition: 0.3s; display: flex; justify-content: center; align-items: center; gap: 8px;
         }
 
-        .contact-section {
-            background-color: #f4f4f4;
-            padding: 40px;
-            margin: 20px auto;
-            max-width: 600px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .contact-section h1 {
-            font-size: 36px;
-            color: #333;
-            margin-bottom: 20px;
-        }
-
-        .contact-section form {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .contact-section label {
-            text-align: left;
-            margin: 10px 0 5px;
-            font-weight: bold;
-        }
-
-        .contact-section input[type="text"],
-        .contact-section input[type="email"],
-        .contact-section textarea {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-
-        .contact-section button {
-            padding: 10px;
-            background-color: #000000;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        .contact-section button:hover {
-            background-color: #444444;
-        }
-
-        .success-message {
-            margin-top: 20px;
-            color: green;
-        }
-
-        .error-message {
-            margin-top: 20px;
-            color: red;
-        }
+        .alert-success { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
     </style>
 </head>
 <body>
-    <a href="index.php" class="back-home-btn">Back to Home</a>
-    <section class="contact-section">
-        <h1>Queries</h1>
-        <form action="" method="post">
-            <label for="name">Name:</label>
-            <input type="text" id="name" name="name" required>
 
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-            <label for="query">Query:</label>
-            <textarea id="query" name="query" rows="5" required></textarea>
+<div class="container">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <a href="index.php" style="background:var(--input-bg); color:var(--text-color); border:1px solid var(--card-border); padding:10px 18px; border-radius:12px; text-decoration:none; font-weight:600; font-size:14px; display:inline-flex; align-items:center; gap:6px;">
+            <i class='bx bx-left-arrow-alt'></i> 🏠 Back to Home
+        </a>
+    </div>
 
-            <button type="submit" style="font-family: 'Josefin Sans', sans-serif;">Send Queries</button>
-        </form>
+    <div class="card">
+        <h2>❓ FlexiRide Support Helpdesk</h2>
+        <p>Have a question or need assistance with your rides? Send us a message!</p>
 
-        <?php if (!empty($successMessage)): ?>
-            <div class="success-message"><?php echo $successMessage; ?></div>
+        <?php if ($successMessage): ?>
+            <div class="alert-success"><?php echo htmlspecialchars($successMessage); ?></div>
         <?php endif; ?>
-    </section>
+
+        <?php if ($errorMessage): ?>
+            <div class="alert-error"><?php echo htmlspecialchars($errorMessage); ?></div>
+        <?php endif; ?>
+
+        <form method="POST">
+            <div class="form-group">
+                <label>Your Name *</label>
+                <input type="text" name="name" value="<?php echo htmlspecialchars($name); ?>" placeholder="Enter your full name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Your Email Address *</label>
+                <input type="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="Enter your email" required>
+            </div>
+
+            <div class="form-group">
+                <label>Your Query / Question *</label>
+                <textarea name="query" rows="5" placeholder="Describe your question or issue in detail..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit"><i class='bx bxs-paper-plane'></i> Submit Query to Support →</button>
+        </form>
+    </div>
+</div>
 </body>
 </html>

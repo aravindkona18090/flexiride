@@ -1,7 +1,7 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
-include 'mailer.php';
+include_once __DIR__ . '/includes/mailer.php';
 
 function sendOtpEmail($toEmail, $otp) {
     $html = "

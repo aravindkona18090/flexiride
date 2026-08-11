@@ -1,7 +1,7 @@
 <?php
 session_start();
-include 'db.php';
-include 'mailer.php';
+include_once __DIR__ . '/includes/db.php';
+include_once __DIR__ . '/includes/mailer.php';
 
 $error = '';
 $success = '';
@@ -88,7 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['is_admin'] = true;
             $_SESSION['user_id']  = 9999;
             $_SESSION['name']     = 'System Admin';
-            header("Location: admin_dashboard.php");
+            header("Location: admin/admin_dashboard.php");
             exit();
         }
 
@@ -166,7 +166,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="auth-container">
     <div class="auth-card">

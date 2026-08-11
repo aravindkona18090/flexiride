@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
 
 // If user_id from session (or set manually for demo)

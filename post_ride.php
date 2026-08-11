@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include_once __DIR__ . '/includes/db.php';
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
@@ -170,7 +170,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <!-- Aadhaar Gatekeeper Modal -->
 <?php if (!$isAadhaarVerified): ?>
@@ -285,10 +285,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 
 <script>
+    const mapTilerKey = 'fMfeiTRB4wmIuS13BrCk';
     const map = L.map('map').setView([13.6288, 79.4192], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+
+    const maptilerStreets = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`, {
+        tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 20,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+    });
+
+    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri World Imagery'
+    });
+
+    const maptilerSatellite = L.tileLayer(`https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${mapTilerKey}`, {
+        tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 20,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a>'
+    });
+
+    const maptilerDark = L.tileLayer(`https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.png?key=${mapTilerKey}`, {
+        tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 20,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a>'
+    });
+
+    maptilerStreets.addTo(map);
+
+    L.control.layers({
+        "🏙️ MapTiler Streets": maptilerStreets,
+        "🛰️ Satellite Hybrid": maptilerSatellite,
+        "🌍 Satellite HD (Esri)": esriSatellite,
+        "🌑 Dataviz Dark": maptilerDark
     }).addTo(map);
+
+    // Auto-detect user's live GPS current location with high street precision
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+            map.setView([userLat, userLng], 15);
+
+            L.circle([userLat, userLng], {
+                color: '#0284c7',
+                fillColor: '#38bdf8',
+                fillOpacity: 0.8,
+                radius: 10
+            }).addTo(map);
+
+            L.marker([userLat, userLng]).addTo(map).bindPopup('📍 You Are Here').openPopup();
+        }, function(error) {
+            console.log("GPS Location permission fallback:", error);
+        }, { enableHighAccuracy: true });
+    }
 
     let origMarker = null;
     let destMarker = null;
@@ -327,61 +374,69 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         routePolylines.forEach(l => map.removeLayer(l.line));
         routePolylines = [];
 
-        // Calculate Haversine Base Distance
-        const R = 6371;
-        const dLat = (p2.lat - p1.lat) * Math.PI / 180;
-        const dLon = (p2.lng - p1.lng) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const baseDist = Math.max(10, Math.round(R * c * 1.2));
-
-        // Sample 3 intermediate coordinates along 3 distinct geographical arcs
-        const midLat = (p1.lat + p2.lat) / 2;
-        const midLng = (p1.lng + p2.lng) / 2;
-
-        const waypoints = [
-            { name: "Direct Highway Route", lat: midLat, lng: midLng, color: "#38bdf8", factor: 1.1 },
-            { name: "Northern Corridor Route", lat: midLat + 0.08, lng: midLng - 0.05, color: "#a855f7", factor: 1.25 },
-            { name: "Southern Corridor Route", lat: midLat - 0.08, lng: midLng + 0.05, color: "#22c55e", factor: 1.2 }
-        ];
-
         const pillsBox = document.getElementById('routePillsBox');
         const pillsList = document.getElementById('routePillsList');
-        pillsList.innerHTML = '<div style="color:var(--text-muted); font-size:14px; text-align:center; padding:10px;">🔍 Reverse-geocoding real intermediate cities along routes...</div>';
+        pillsList.innerHTML = '<div style="color:var(--text-muted); font-size:14px; text-align:center; padding:12px;">🗺️ Calculating real road route alternatives from OSRM Navigation...</div>';
         pillsBox.style.display = 'block';
 
-        const routesData = [];
+        try {
+            // Fetch 100% Real Road Alternative Routes from OSRM Engine
+            const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${p1.lng},${p1.lat};${p2.lng},${p2.lat}?overview=full&geometries=geojson&alternatives=true`;
+            const res = await fetch(osrmUrl);
+            const data = await res.json();
 
-        for (let i = 0; i < waypoints.length; i++) {
-            const wp = waypoints[i];
-            let cityName = "Major Transit Hub";
+            if (data && data.routes && data.routes.length > 0) {
+                const colors = ['#38bdf8', '#a855f7', '#22c55e', '#f59e0b'];
+                const routesData = [];
 
-            try {
-                const rRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${wp.lat}&lon=${wp.lng}&zoom=10`);
-                const rData = await rRes.json();
-                if (rData && rData.address) {
-                    cityName = rData.address.city || rData.address.town || rData.address.county || rData.address.state_district || rData.address.suburb || "Intermediate Station";
+                for (let i = 0; i < data.routes.length; i++) {
+                    const r = data.routes[i];
+                    const coords = r.geometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON [lon, lat] -> Leaflet [lat, lon]
+                    const distKm = Math.max(1, Math.round(r.distance / 1000));
+                    const durMins = Math.round(r.duration / 60);
+
+                    // Reverse geocode midpoint for real city name
+                    const midIdx = Math.floor(coords.length / 2);
+                    const midPt = coords[midIdx];
+                    let viaCity = (i === 0) ? "Primary Highway" : `Alternative Route ${i}`;
+
+                    try {
+                        const rRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${midPt[0]}&lon=${midPt[1]}&zoom=10`);
+                        const rData = await rRes.json();
+                        if (rData && rData.address) {
+                            viaCity = rData.address.city || rData.address.town || rData.address.county || rData.address.state_district || viaCity;
+                        }
+                    } catch (err) { console.log(err); }
+
+                    routesData.push({
+                        name: (i === 0) ? `Via ${viaCity} (Fastest Highway Route)` : `Via ${viaCity} (Alternative Road ${i})`,
+                        dist: distKm,
+                        dur: durMins,
+                        coords: coords,
+                        color: colors[i % colors.length]
+                    });
                 }
-            } catch (err) {
-                console.log("Geocode city fetch:", err);
+
+                displayRoutePillsAndPolylines(routesData);
+            } else {
+                throw new Error("No OSRM routes found");
             }
-
-            const routeDist = Math.round(baseDist * wp.factor);
-            const routeDur  = Math.round(routeDist * 1.4);
-            const routeLabel = `Via ${cityName} (${wp.name})`;
-
-            routesData.push({
-                name: routeLabel,
-                dist: routeDist,
-                dur: routeDur,
-                coords: [[p1.lat, p1.lng], [wp.lat, wp.lng], [p2.lat, p2.lng]],
-                color: wp.color
-            });
+        } catch (err) {
+            console.error("OSRM Route fetch error, using fallback geometry:", err);
+            // Fallback geometry if offline
+            const R = 6371;
+            const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+            const dLon = (p2.lng - p1.lng) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const baseDist = Math.max(10, Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.2));
+            const routesData = [
+                { name: "Direct Highway Route", dist: baseDist, dur: Math.round(baseDist * 1.3), coords: [[p1.lat, p1.lng], [p2.lat, p2.lng]], color: "#38bdf8" },
+                { name: "Bypass Alternative Route", dist: Math.round(baseDist * 1.15), dur: Math.round(baseDist * 1.5), coords: [[p1.lat, p1.lng], [(p1.lat+p2.lat)/2 + 0.05, (p1.lng+p2.lng)/2 - 0.05], [p2.lat, p2.lng]], color: "#a855f7" }
+            ];
+            displayRoutePillsAndPolylines(routesData);
         }
-
-        displayRoutePillsAndPolylines(routesData);
     }
 
     function displayRoutePillsAndPolylines(routesData) {
