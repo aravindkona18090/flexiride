@@ -1,14 +1,16 @@
 # 🚗 FlexiRide
 
-**Safe, affordable, shared rides — for everyone going the same way.**
+**Safe, affordable campus ride-sharing — for everyone going the same way.**
 
-A full-stack ride-sharing web application that connects drivers and passengers, inspired by services like BlaBlaCar. Post a ride, find a ride, book a seat, and travel with built-in safety features.
+FlexiRide is a full-stack ride-sharing web application built with PHP and MySQL. It connects drivers and passengers for shared commutes, with a strong focus on **safety, identity verification, and trust** — built specifically around the campus ride-sharing use case.
 
 <p>
   <img src="https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white" alt="PHP">
   <img src="https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white" alt="MySQL">
   <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Composer-885630?style=flat&logo=composer&logoColor=white" alt="Composer">
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/Railway-0B0D0E?style=flat&logo=railway&logoColor=white" alt="Railway">
   <img src="https://img.shields.io/badge/status-active-success" alt="status">
 </p>
 
@@ -16,148 +18,7 @@ A full-stack ride-sharing web application that connects drivers and passengers, 
 
 ---
 
-## 📖 Overview
-
-FlexiRide is a PHP and MySQL ride-sharing platform built around four things: **easy ride posting and discovery, secure profile management, OTP-based account recovery, and rider safety** — all wrapped in a straightforward booking flow with feedback collection and an admin dashboard to keep the platform healthy.
-
----
-
-## ✨ Features
-
-### 👤 User Module
-- Registration & secure login
-- Profile management with photo upload
-- Forgot password via OTP
-- Logout
-
-### 🚘 Ride Management
-- Post a ride
-- Find available rides
-- Book a ride
-- View booked & posted rides
-- Edit or delete ride details
-- Mark a ride as reached
-
-### 🛡️ Safety Features
-- Emergency SOS ("Danger") button
-- Automatic emergency email notifications
-- User verification
-- Privacy policy in-app
-
-### ⭐ Feedback & Support
-- Submit feedback
-- Contact / queries module
-
-### 👨‍💼 Admin Module
-- Admin login & dashboard
-- Manage, edit, or delete users
-- View user feedback and queries
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | HTML5, CSS3, JavaScript |
-| Backend | PHP |
-| Database | MySQL |
-| Libraries | PHPMailer, Composer |
-
----
-
-## 🔒 Security
-
-- Password hashing
-- Session-based authentication
-- OTP password recovery
-- Prepared SQL statements
-- Input validation
-
----
-
-## 📂 Project Structure
-
-```
-FlexiRide/
-│
-├── images/
-├── uploads/
-├── PHPMailer/
-├── vendor/
-├── about.php
-├── admin_dashboard.php
-├── admin_manage_users.php
-├── admin_edit_user.php
-├── admin_delete_user.php
-├── admin_feedback.php
-├── admin_queries.php
-├── book_ride.php
-├── booking_success.php
-├── danger.php
-├── db.php
-├── edit_profile.php
-├── edit_ride.php
-├── feedback.php
-├── find_ride.php
-├── forgot_password.php
-├── forgot_otp.php
-├── index.php
-├── login.php
-├── logout.php
-├── myrides.php
-├── my_booked_rides.php
-├── otp_verify.php
-├── post_ride.php
-├── privacy.php
-├── profile.php
-├── queries.php
-├── reached.php
-├── rides.php
-├── ride_output.php
-├── ride_success.php
-├── upload_photo.php
-├── view_photos.php
-├── blablacar_clone.sql
-└── README.md
-```
-
----
-
-## 🚀 Getting Started
-
-1. Install [XAMPP](https://www.apachefriends.org/).
-2. Start **Apache** and **MySQL**.
-3. Copy the project into:
-   ```
-   C:\xampp\htdocs\
-   ```
-4. Open phpMyAdmin and create a database named:
-   ```
-   blablacar_clone
-   ```
-5. Import:
-   ```
-   blablacar_clone.sql
-   ```
-6. Update the database credentials in:
-   ```
-   db.php
-   ```
-7. Open your browser:
-   ```
-   http://localhost/FlexiRide
-   ```
-
-> Prefer not to set up locally? Try the live demo instead: **[flexiride.up.railway.app](https://flexiride.up.railway.app/)**
-
----
-
 ## 📸 Screenshots
-
-```
-screenshots/
-```
 
 ![Home](screenshots/home.png)
 ![Post Ride](screenshots/post-ride.png)
@@ -166,20 +27,210 @@ screenshots/
 
 ---
 
-## 🎯 Future Enhancements
+## 📖 Overview
 
-- Google Maps integration
-- Live GPS tracking
-- Ride ratings & reviews
-- AI-based ride recommendations
-- Real-time notifications
-- Mobile application
+FlexiRide covers the complete ride-sharing lifecycle: **post → discover → book → travel → rate**. Beyond the core booking flow, it includes real-time in-app chat between driver and passenger, an emergency SOS system with automatic email alerts, Aadhaar/DL document verification reviewed by admins, OTP-based phone and account recovery, trip receipts, a trust scoring system, CO₂ savings tracking, and a full admin dashboard.
+
+The platform is deployed on [Railway](https://railway.app/) with Docker + FrankenPHP and uses environment variables for all secrets — no hardcoded credentials.
+
+---
+
+## ✨ Features
+
+### 👤 User Accounts
+- Registration and secure login (bcrypt password hashing)
+- Profile management with photo upload
+- OTP-based forgot password flow (email delivery via Resend API)
+- Emergency contact registration
+- CO₂ saved and money saved statistics per user
+
+### 🚘 Ride Management
+- Post a ride (bike or car, EV flag, helmet availability, gender preference, luggage limit)
+- Dynamic tiered pricing suggestion based on distance, vehicle type, and peak hours
+- Find rides with geospatial matching using the Haversine formula
+- Book a seat with automatic email confirmation to both driver and passenger
+- View and manage all posted and booked rides
+- Edit or delete a posted ride
+- Mark a trip as reached (complete the journey)
+- Trip receipt download after completion
+
+### 💬 In-App Chat
+- Real-time-style chat between driver and passenger per booking
+- Accessible from the ride management page
+
+### 🛡️ Safety & Verification
+- **Emergency SOS ("Danger") button** — triggers instant email alerts to registered emergency contacts
+- Admin-monitored SOS log dashboard
+- **Trust Score** — weighted score (0–100%) based on phone OTP verification (+30), Aadhaar verification (+35), and DL verification (+15)
+- Aadhaar number validation using the Verhoeff checksum algorithm
+- Document upload for Aadhaar and Driving Licence — admin reviews and approves
+- DigiLocker OAuth integration for government document verification
+- Privacy policy in-app
+
+### ⭐ Ratings & Feedback
+- Post-trip star ratings and written reviews for driver/passenger
+- Average rating displayed on profile and ride listings
+- Platform feedback and support queries module
+
+### 🔔 Notifications
+- In-app notification bell with unread count
+- Booking confirmation, new booking, and trip update notifications
+
+### 👨‍💼 Admin Panel (`/admin`)
+- Dashboard with platform statistics
+- Manage, edit, or delete user accounts
+- Review and approve uploaded identity documents (Aadhaar, DL)
+- Broadcast announcements to all users
+- View SOS emergency logs
+- Moderate user feedback and support queries
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | PHP 8.2 |
+| Database | MySQL / MariaDB (3NF normalised schema) |
+| Frontend | HTML5, CSS3, Vanilla JavaScript |
+| Fonts & Icons | Google Fonts (Outfit), Boxicons |
+| Email | Resend API, PHPMailer |
+| SMS / OTP | Twilio SDK |
+| Deployment | Docker (FrankenPHP), Railway |
+| Dependencies | Composer |
+
+---
+
+## 🗂️ Project Structure
+
+```
+FlexiRide/
+│
+├── admin/                    # Admin-only pages (dashboard, users, docs, SOS logs)
+│   ├── admin_dashboard.php
+│   ├── admin_manage_users.php
+│   ├── admin_edit_user.php
+│   ├── admin_delete_user.php
+│   ├── admin_verify_docs.php
+│   ├── admin_sos_logs.php
+│   ├── admin_broadcast.php
+│   ├── admin_feedback.php
+│   └── admin_queries.php
+│
+├── includes/                 # Shared PHP utilities
+│   ├── db.php                # Database connection
+│   ├── mailer.php            # Email sending (Resend API)
+│   ├── sms.php               # SMS OTP (Twilio)
+│   ├── navbar.php / footer.php
+│   ├── dynamic_pricing.php   # Tiered pricing with peak-hour surge
+│   ├── trust_score.php       # Weighted user trust scoring
+│   └── geo_utils.php         # Haversine distance calculation
+│
+├── assets/js/                # Frontend JavaScript
+├── screenshots/              # README screenshots
+│
+├── index.php                 # Landing page
+├── login.php / logout.php
+├── find_ride.php             # Ride search and listing
+├── post_ride.php             # Ride creation form
+├── book_ride.php             # Seat booking
+├── booking_success.php
+├── my_booked_rides.php       # Passenger's bookings
+├── myrides.php               # Driver's posted rides
+├── ride_details.php
+├── edit_ride.php / delete_ride.php
+├── reached.php               # Trip completion
+├── receipt.php               # Trip receipt
+├── chat.php                  # Driver–passenger messaging
+├── rate_ride.php             # Post-trip ratings
+├── profile.php / edit_profile.php
+├── notifications.php
+├── danger.php                # Emergency SOS trigger
+├── digilocker_connect.php    # DigiLocker OAuth
+├── forgot_password.php / forgot_otp.php / otp_verify.php
+├── feedback.php / queries.php / about.php / privacy.php
+│
+├── flexiride.sql             # Full database schema + seed admin account
+├── .env.example              # Environment variable template
+├── Dockerfile                # FrankenPHP container config
+└── composer.json             # PHP dependencies
+```
+
+---
+
+## 🚀 Getting Started (Local — XAMPP)
+
+### Prerequisites
+- [XAMPP](https://www.apachefriends.org/) with Apache and MySQL running
+- PHP 8.0+
+
+### Steps
+
+1. **Clone the repository** into your XAMPP htdocs folder:
+   ```bash
+   git clone https://github.com/aravindkona18090/FlexiRide.git C:/xampp/htdocs/FlexiRide
+   ```
+
+2. **Import the database schema:**
+   - Open [phpMyAdmin](http://localhost/phpmyadmin)
+   - Click **Import** and select `flexiride.sql`
+   - This creates the `flexiride` database with all tables and a default admin account
+
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` with your database credentials and API keys.
+
+4. **Install PHP dependencies:**
+   ```bash
+   composer install
+   ```
+
+5. **Open in browser:**
+   ```
+   http://localhost/FlexiRide
+   ```
+
+### Default Admin Login
+| Field | Value |
+|---|---|
+| Email | `admin@flexiride.com` |
+| Password | `Admin@123` |
+
+> Prefer not to set up locally? Try the live demo: **[flexiride.up.railway.app](https://flexiride.up.railway.app/)**
+
+---
+
+## 🐳 Docker Deployment
+
+The project includes a `Dockerfile` using [FrankenPHP](https://frankenphp.dev/) (PHP 8.2).
+
+```bash
+docker build -t flexiride .
+docker run -p 8080:8080 --env-file .env flexiride
+```
+
+The app is deployed on Railway via this Docker config with environment variables set in the Railway dashboard — no secrets committed to the repository.
+
+---
+
+## 🔒 Security
+
+- Passwords hashed with `password_hash()` (bcrypt)
+- Session-based authentication with role separation (user / admin)
+- All database queries use MySQLi prepared statements
+- OTP-based phone verification and account recovery
+- Aadhaar number validated with Verhoeff checksum before storage
+- File uploads validated by server-side MIME type detection and renamed with random IDs
+- Environment variables for all credentials (never hardcoded)
+- Admin panel protected by explicit `is_admin` session role check on every page
 
 ---
 
 ## 👨‍💻 Author
 
-**Kona Aravind Ranga Reddy**
+**Kona Aravind Ranga Reddy**  
 B.Tech, Artificial Intelligence & Machine Learning
 
 - GitHub: [@aravindkona18090](https://github.com/aravindkona18090)
