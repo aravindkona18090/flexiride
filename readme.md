@@ -16,14 +16,6 @@ FlexiRide is a full-stack ride-sharing web application built with PHP and MySQL.
 
 **🔗 Live Demo:** [flexiride.up.railway.app](https://flexiride.up.railway.app/)
 
----
-
-## 📸 Screenshots
-
-![Home](screenshots/home.png)
-![Post Ride](screenshots/post-ride.png)
-![Find Ride](screenshots/find-ride.png)
-![My Rides](screenshots/myrides.png)
 
 ---
 
@@ -127,7 +119,6 @@ FlexiRide/
 │   └── geo_utils.php         # Haversine distance calculation
 │
 ├── assets/js/                # Frontend JavaScript
-├── screenshots/              # README screenshots
 │
 ├── index.php                 # Landing page
 ├── login.php / logout.php
