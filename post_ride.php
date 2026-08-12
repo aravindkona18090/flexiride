@@ -84,6 +84,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION['vehicle_model']     = $v_model;
         $_SESSION['luggage_limit']     = $_POST['luggage_limit'] ?? 'Backpack only';
         $_SESSION['route_distance']    = (float)($_POST['route_distance'] ?? 25.0);
+        $_SESSION['via_route_name']    = $chosen_route_name;
 
         header("Location: ride_output.php");
         exit();

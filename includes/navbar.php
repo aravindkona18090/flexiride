@@ -286,6 +286,13 @@ if (isset($_SESSION['user_id'])) {
     }
 </style>
 
+<?php if (!empty($_SESSION['alert_message'])): ?>
+    <div style="background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px 20px; text-align: center; font-weight: 600; font-size: 14px; position: relative;">
+        <?php echo htmlspecialchars($_SESSION['alert_message']); ?>
+        <?php unset($_SESSION['alert_message']); ?>
+    </div>
+<?php endif; ?>
+
 <nav class="navbar">
     <a href="<?php echo $navRel; ?>index.php" class="logo">
         <span class="logo-badge"><i class='bx bxs-bolt'></i></span>

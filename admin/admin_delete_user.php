@@ -3,8 +3,13 @@ include_once __DIR__ . '/../includes/db.php';  // Include database connection
 session_start();
 
 // Ensure the user is an admin
-if (!isset($_GET['id'])) {
+if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../login.php');
+    exit();
+}
+
+if (!isset($_GET['id'])) {
+    header('Location: admin_manage_users.php');
     exit();
 }
 
