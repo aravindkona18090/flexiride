@@ -107,10 +107,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     if (empty($errorMsg)) {
-        $update_stmt = $conn->prepare("UPDATE users SET name=?, phone=?, dob=?, gender=?, upi_id=?, is_upi_verified=?, aadhaar_number=?, is_aadhaar_verified=?, is_verified=?, dl_number=?, is_dl_verified=?, college_email=?, is_college_email_verified=?, campus_name=?, emergency_email1=?, emergency_email2=?, emergency_phone=?, city=? WHERE id=?");
+        $oldPhone = trim($user['phone'] ?? '');
+        $is_phone_ver = ($phone === $oldPhone) ? (int)($user['is_phone_verified'] ?? 0) : 0;
+
+        safeAddColumn($conn, 'users', 'is_phone_verified', "TINYINT(1) NOT NULL DEFAULT 0");
+        $update_stmt = $conn->prepare("UPDATE users SET name=?, phone=?, is_phone_verified=?, dob=?, gender=?, upi_id=?, is_upi_verified=?, aadhaar_number=?, is_aadhaar_verified=?, is_verified=?, dl_number=?, is_dl_verified=?, college_email=?, is_college_email_verified=?, campus_name=?, emergency_email1=?, emergency_email2=?, emergency_phone=?, city=? WHERE id=?");
         
         if ($update_stmt) {
-            $update_stmt->bind_param("sssssisiisisssssssi", $name, $phone, $dob, $gender, $upi_id, $is_upi_valid, $aadhaar_number, $is_aadhaar_valid, $is_aadhaar_valid, $dl_number, $is_dl_valid, $college_email, $is_college_valid, $campus_name, $emergency_email1, $emergency_email2, $emergency_phone, $city, $user_id);
+            $update_stmt->bind_param("ssisssisiisisssssssi", $name, $phone, $is_phone_ver, $dob, $gender, $upi_id, $is_upi_valid, $aadhaar_number, $is_aadhaar_valid, $is_aadhaar_valid, $dl_number, $is_dl_valid, $college_email, $is_college_valid, $campus_name, $emergency_email1, $emergency_email2, $emergency_phone, $city, $user_id);
             $update_stmt->execute();
         }
 
