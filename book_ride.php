@@ -8,6 +8,11 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Generate CSRF token for this session
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $ride_id = isset($_GET['ride_id']) ? (int)$_GET['ride_id'] : 0;
 $current_user_id = $_SESSION['user_id'];
 $successMessage = "";
@@ -29,68 +34,78 @@ $userStmt->execute();
 $currentUser = $userStmt->get_result()->fetch_assoc();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // CSRF validation
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        die("Invalid request. Please go back and try again.");
+    }
+
     $seats_booked = (int)($_POST['seats_booked'] ?? 1);
 
-    if ($ride['seats_available'] >= $seats_booked && $seats_booked > 0) {
-        $new_seats = $ride['seats_available'] - $seats_booked;
+    if ($seats_booked > 0) {
         $total_price = $ride['price'] * $seats_booked;
+        $txn_ref     = 'TXN-FLX-' . strtoupper(substr(md5(uniqid()), 0, 8));
+        $trip_otp    = (string)rand(1000, 9999);
 
-        $updateStmt = $conn->prepare("UPDATE rides SET seats_available = ? WHERE id = ?");
-        $updateStmt->bind_param("ii", $new_seats, $ride_id);
+        // Atomic seat reservation — prevents double-booking race condition
+        $conn->begin_transaction();
+        $updateStmt = $conn->prepare(
+            "UPDATE rides SET seats_available = seats_available - ?
+             WHERE id = ? AND seats_available >= ?"
+        );
+        $updateStmt->bind_param("iii", $seats_booked, $ride_id, $seats_booked);
         $updateStmt->execute();
 
-        // 💳 Free UPI Payment Escrow & 📱 Free SMS Trip OTP Engine
-        $txn_ref  = 'TXN-FLX-' . strtoupper(substr(md5(uniqid()), 0, 8));
-        $trip_otp = (string)rand(1000, 9999);
-
-        safeAddColumn($conn, 'bookings', 'total_price', "DECIMAL(10,2) NOT NULL DEFAULT 0.00");
-        safeAddColumn($conn, 'bookings', 'posted_email', "VARCHAR(150) NULL");
-        safeAddColumn($conn, 'bookings', 'booked_email', "VARCHAR(150) NULL");
-        safeAddColumn($conn, 'bookings', 'payment_status', "VARCHAR(50) NOT NULL DEFAULT 'Escrow Held'");
-        safeAddColumn($conn, 'bookings', 'txn_ref', "VARCHAR(100) NULL");
-        safeAddColumn($conn, 'bookings', 'trip_otp', "VARCHAR(10) NULL");
-
-        $bookStmt = $conn->prepare("INSERT INTO bookings (user_id, ride_id, seats_booked, total_price, posted_email, booked_email, trip_status, payment_status, txn_ref, trip_otp) VALUES (?, ?, ?, ?, ?, ?, 'Confirmed', 'Escrow Held', ?, ?)");
-        $bookStmt->bind_param("iiidssss", $current_user_id, $ride_id, $seats_booked, $total_price, $ride['driver_email'], $currentUser['email'], $txn_ref, $trip_otp);
-
-        if ($bookStmt->execute()) {
-            $booking_id = $bookStmt->insert_id;
-            $_SESSION['last_sms_otp'] = [
-                'phone'   => $currentUser['phone'] ?: '7386614044',
-                'otp'     => $trip_otp,
-                'txn_ref' => $txn_ref,
-                'amount'  => $total_price
-            ];
-
-            // Trigger Notification for Driver
-            $n1 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
-            $n1_title = "🎉 New Ride Booking Request!";
-            $n1_msg = "{$currentUser['name']} booked {$seats_booked} seat(s) for your trip from {$ride['origin']} to {$ride['destination']}.";
-            $n1->bind_param("iss", $ride['user_id'], $n1_title, $n1_msg);
-            $n1->execute();
-
-            // Trigger Notification for Passenger
-            $n2 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
-            $n2_title = "✅ Booking Confirmed!";
-            $n2_msg = "Your booking for {$ride['origin']} to {$ride['destination']} with {$ride['driver_name']} is confirmed.";
-            $n2->bind_param("iss", $current_user_id, $n2_title, $n2_msg);
-            $n2->execute();
-
-            $bookingHtml = "
-                <h2>Booking Confirmed</h2>
-                <p>You have successfully booked <strong>$seats_booked seat(s)</strong> for the trip from <strong>{$ride['origin']}</strong> to <strong>{$ride['destination']}</strong>.</p>
-                <p><strong>Driver:</strong> {$ride['driver_name']} ({$ride['driver_phone']})</p>
-                <p><strong>Date &amp; Time:</strong> {$ride['ride_date']} at {$ride['ride_time']}</p>
-            ";
-            sendResendMail($currentUser['email'], $currentUser['name'], 'FlexiRide - Booking Confirmed!', $bookingHtml);
-
-            header("Location: booking_success.php?ride_id=" . $ride_id . "&booking_id=" . $booking_id);
-            exit();
+        if ($conn->affected_rows === 0) {
+            $conn->rollback();
+            $errorMessage = "Not enough seats available. Please try with fewer seats.";
         } else {
-            $errorMessage = "Booking failed: " . $conn->error;
+            $bookStmt = $conn->prepare("INSERT INTO bookings (user_id, ride_id, seats_booked, total_price, posted_email, booked_email, trip_status, payment_status, txn_ref, trip_otp) VALUES (?, ?, ?, ?, ?, ?, 'Confirmed', 'Escrow Held', ?, ?)");
+            $bookStmt->bind_param("iiidssss", $current_user_id, $ride_id, $seats_booked, $total_price, $ride['driver_email'], $currentUser['email'], $txn_ref, $trip_otp);
+
+            if ($bookStmt->execute()) {
+                $conn->commit();
+                $booking_id = $bookStmt->insert_id;
+
+                if (!empty($currentUser['phone'])) {
+                    $_SESSION['last_sms_otp'] = [
+                        'phone'   => $currentUser['phone'],
+                        'otp'     => $trip_otp,
+                        'txn_ref' => $txn_ref,
+                        'amount'  => $total_price
+                    ];
+                }
+
+                // Notification for Driver
+                $n1 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
+                $n1_title = "🎉 New Ride Booking Request!";
+                $n1_msg   = "{$currentUser['name']} booked {$seats_booked} seat(s) for your trip from {$ride['origin']} to {$ride['destination']}.";
+                $n1->bind_param("iss", $ride['user_id'], $n1_title, $n1_msg);
+                $n1->execute();
+
+                // Notification for Passenger
+                $n2 = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
+                $n2_title = "✅ Booking Confirmed!";
+                $n2_msg   = "Your booking for {$ride['origin']} to {$ride['destination']} with {$ride['driver_name']} is confirmed.";
+                $n2->bind_param("iss", $current_user_id, $n2_title, $n2_msg);
+                $n2->execute();
+
+                $bookingHtml = "
+                    <h2>Booking Confirmed</h2>
+                    <p>You have successfully booked <strong>$seats_booked seat(s)</strong> for the trip from <strong>{$ride['origin']}</strong> to <strong>{$ride['destination']}</strong>.</p>
+                    <p><strong>Driver:</strong> {$ride['driver_name']} ({$ride['driver_phone']})</p>
+                    <p><strong>Date &amp; Time:</strong> {$ride['ride_date']} at {$ride['ride_time']}</p>
+                ";
+                sendResendMail($currentUser['email'], $currentUser['name'], 'FlexiRide - Booking Confirmed!', $bookingHtml);
+
+                header("Location: booking_success.php?ride_id=" . $ride_id . "&booking_id=" . $booking_id);
+                exit();
+            } else {
+                $conn->rollback();
+                $errorMessage = "Booking failed. Please try again.";
+            }
         }
     } else {
-        $errorMessage = "Requested seats exceed available seat capacity.";
+        $errorMessage = "Please select at least 1 seat.";
     }
 }
 ?>
@@ -160,6 +175,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
 
         <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot book while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.style.pointerEvents = 'none'; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Securing seat & notifying driver...`;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
             <div style="margin-bottom: 20px;">
                 <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select Seats to Book</label>
                 <input type="number" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" style="width:100%; padding:14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:16px; outline:none;" required>
