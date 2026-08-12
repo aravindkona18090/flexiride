@@ -16,8 +16,6 @@ $navUnreadCount = 0;
 if (isset($_SESSION['user_id'])) {
     $uId = $_SESSION['user_id'];
 
-    safeAddColumn($conn, 'notifications', 'is_read', "TINYINT(1) NOT NULL DEFAULT 0");
-
     $userStmt = $conn->prepare("SELECT name, profile_photo FROM users WHERE id = ?");
     if ($userStmt) {
         $userStmt->bind_param("i", $uId);

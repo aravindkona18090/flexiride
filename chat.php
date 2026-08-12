@@ -48,8 +48,6 @@ if (!$ride) {
 }
 
 // Handle Send Message (Normal POST or AJAX)
-safeAddColumn($conn, 'messages', 'receiver_id', "INT NOT NULL DEFAULT 0");
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
     $msg_text = trim($_POST['message']);
     $receiver_id = isset($_REQUEST['receiver_id']) ? (int)$_REQUEST['receiver_id'] : 0;
