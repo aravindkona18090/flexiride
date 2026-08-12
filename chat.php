@@ -48,23 +48,25 @@ if (!$ride) {
 }
 
 // Handle Send Message (Normal POST or AJAX)
+safeAddColumn($conn, 'messages', 'receiver_id', "INT NOT NULL DEFAULT 0");
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
     $msg_text = trim($_POST['message']);
     $receiver_id = isset($_REQUEST['receiver_id']) ? (int)$_REQUEST['receiver_id'] : 0;
 
     if ($receiver_id <= 0) {
         if ($user_id == $ride['user_id']) {
-            $bStmt = $conn->prepare("SELECT user_id FROM bookings WHERE ride_id = ? AND trip_status != 'Cancelled' LIMIT 1");
+            $bStmt = $conn->prepare("SELECT user_id FROM bookings WHERE ride_id = ? AND trip_status != 'Cancelled' ORDER BY id DESC LIMIT 1");
             $bStmt->bind_param("i", $ride_id);
             $bStmt->execute();
             $bRes = $bStmt->get_result()->fetch_assoc();
-            $receiver_id = $bRes ? (int)$bRes['user_id'] : 0;
+            $receiver_id = $bRes ? (int)$bRes['user_id'] : (int)$ride['user_id'];
         } else {
             $receiver_id = (int)$ride['user_id'];
         }
     }
 
-    if (!empty($msg_text) && $receiver_id > 0) {
+    if (!empty($msg_text)) {
         $msgStmt = $conn->prepare("INSERT INTO messages (ride_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)");
         $msgStmt->bind_param("iiis", $ride_id, $user_id, $receiver_id, $msg_text);
         $msgStmt->execute();
@@ -96,10 +98,10 @@ $messagesRes = $messagesStmt->get_result();
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
+        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
         
         .chat-container {
-            max-width: 750px;
+            max-width: 780px;
             margin: 30px auto;
             width: 100%;
             padding: 0 20px;
@@ -107,24 +109,31 @@ $messagesRes = $messagesStmt->get_result();
             display: flex;
             flex-direction: column;
         }
+        .chat-window-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
         .chat-header {
-            background: #1e293b;
+            background: var(--card-bg);
             padding: 20px 25px;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
-            border: 1px solid #334155;
+            border-bottom: 1px solid var(--card-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         .messages-box {
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-top: none;
-            border-bottom: none;
+            background: var(--input-bg);
+            border-bottom: 1px solid var(--card-border);
             flex: 1;
-            min-height: 380px;
-            max-height: 500px;
+            min-height: 400px;
+            max-height: 520px;
             overflow-y: auto;
             padding: 25px;
             display: flex;
@@ -142,44 +151,43 @@ $messagesRes = $messagesStmt->get_result();
         }
         .msg-sent {
             align-self: flex-end;
-            background: linear-gradient(135deg, #0284c7, #2563eb);
+            background: var(--primary-gradient);
             color: white;
             border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
         .msg-received {
             align-self: flex-start;
-            background: #1e293b;
-            color: #f8fafc;
-            border: 1px solid #334155;
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--card-border);
             border-bottom-left-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         .msg-meta {
             font-size: 11px;
-            opacity: 0.7;
+            opacity: 0.75;
             margin-top: 4px;
             text-align: right;
         }
         .chat-input-form {
             display: flex;
             gap: 12px;
-            background: #1e293b;
+            background: var(--card-bg);
             padding: 20px;
-            border-bottom-left-radius: 20px;
-            border-bottom-right-radius: 20px;
-            border: 1px solid #334155;
         }
         .chat-input-form input {
             flex: 1;
             padding: 14px 18px;
             border-radius: 12px;
-            border: 1px solid #334155;
-            background: #0f172a;
-            color: white;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--text-color);
             font-size: 15px;
             outline: none;
         }
         .btn-send {
-            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            background: var(--primary-gradient);
             color: white;
             border: none;
             padding: 14px 24px;
@@ -189,10 +197,10 @@ $messagesRes = $messagesStmt->get_result();
             transition: all 0.3s;
             display: flex; align-items: center; gap: 6px;
         }
-        .btn-send:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4); }
+        .btn-send:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
 
-        .live-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #4ade80; }
-        .live-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
+        .live-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--success-color); }
+        .live-dot { width: 8px; height: 8px; background: var(--success-color); border-radius: 50%; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -202,33 +210,40 @@ $messagesRes = $messagesStmt->get_result();
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="chat-container">
-    <div class="chat-header">
-        <div>
-            <h3 style="font-size:18px; color:var(--text-color);"><?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></h3>
-            <span style="font-size:13px; color:#94a3b8;">Driver: <strong><?php echo htmlspecialchars($ride['driver_name']); ?></strong></span>
-            <div class="live-status" style="margin-left:12px;"><div class="live-dot"></div> Live Polling Active</div>
+    <div class="chat-window-card">
+        <div class="chat-header">
+            <div>
+                <h3 style="font-size:18px; color:var(--text-color);"><?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></h3>
+                <span style="font-size:13px; color:#94a3b8;">Driver: <strong><?php echo htmlspecialchars($ride['driver_name']); ?></strong></span>
+                <div class="live-status" style="margin-left:12px;"><div class="live-dot"></div> Live Polling Active</div>
+            </div>
+            <?php 
+                $isOwner = ($user_id == $ride['user_id']);
+                $backUrl = $isOwner ? 'myrides.php' : 'my_booked_rides.php';
+                $backText = $isOwner ? 'Back to Offered Rides' : 'Back to Booked Trips';
+            ?>
+            <a href="<?php echo $backUrl; ?>" style="color:var(--primary-color); text-decoration:none; font-size:14px; font-weight:600;"><i class='bx bx-left-arrow-alt'></i> <?php echo $backText; ?></a>
         </div>
-        <a href="my_booked_rides.php" style="color:#38bdf8; text-decoration:none; font-size:14px; font-weight:600;"><i class='bx bx-left-arrow-alt'></i> Back to Trips</a>
-    </div>
 
-    <div class="messages-box" id="msgBox">
-        <?php if ($messagesRes->num_rows == 0): ?>
-            <p id="emptyTxt" style="text-align:center; color:#94a3b8; margin-top:40px;">No messages yet. Send a message to coordinate pickup!</p>
-        <?php else: ?>
-            <?php while ($m = $messagesRes->fetch_assoc()): ?>
-                <div class="msg <?php echo ($m['sender_id'] == $user_id) ? 'msg-sent' : 'msg-received'; ?>">
-                    <div style="font-size:12px; font-weight:600; margin-bottom:2px;"><?php echo htmlspecialchars($m['sender_name']); ?></div>
-                    <?php echo htmlspecialchars($m['message']); ?>
-                    <div class="msg-meta"><?php echo date('H:i', strtotime($m['sent_at'])); ?></div>
-                </div>
-            <?php endwhile; ?>
-        <?php endif; ?>
-    </div>
+        <div class="messages-box" id="msgBox">
+            <?php if ($messagesRes->num_rows == 0): ?>
+                <p id="emptyTxt" style="text-align:center; color:#94a3b8; margin-top:40px;">No messages yet. Send a message to coordinate pickup!</p>
+            <?php else: ?>
+                <?php while ($m = $messagesRes->fetch_assoc()): ?>
+                    <div class="msg <?php echo ($m['sender_id'] == $user_id) ? 'msg-sent' : 'msg-received'; ?>">
+                        <div style="font-size:12px; font-weight:600; margin-bottom:2px;"><?php echo htmlspecialchars($m['sender_name']); ?></div>
+                        <?php echo htmlspecialchars($m['message']); ?>
+                        <div class="msg-meta"><?php echo date('H:i', strtotime($m['sent_at'])); ?></div>
+                    </div>
+                <?php endwhile; ?>
+            <?php endif; ?>
+        </div>
 
-    <form class="chat-input-form" id="chatForm">
-        <input type="text" id="msgInput" name="message" placeholder="Type a message..." required autocomplete="off">
-        <button type="submit" class="btn-send"><i class='bx bxs-send'></i> Send</button>
-    </form>
+        <form class="chat-input-form" id="chatForm">
+            <input type="text" id="msgInput" name="message" placeholder="Type a message..." required autocomplete="off">
+            <button type="submit" id="chatSendBtn" class="btn-send"><i class='bx bxs-send'></i> Send</button>
+        </form>
+    </div>
 </div>
 
 <script>
@@ -281,11 +296,18 @@ $messagesRes = $messagesStmt->get_result();
         });
     }
 
-    // Instant Instant Send without Page Reload
+    // Instant Send without Page Reload
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = msgInput.value.trim();
         if (!text) return;
+
+        const sendBtn = document.getElementById('chatSendBtn');
+        if (sendBtn) {
+            sendBtn.style.pointerEvents = 'none';
+            sendBtn.style.opacity = '0.7';
+            sendBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Sending...";
+        }
 
         const formData = new FormData();
         formData.append('message', text);
@@ -297,9 +319,15 @@ $messagesRes = $messagesStmt->get_result();
                 method: 'POST',
                 body: formData
             });
-            fetchMessages();
+            await fetchMessages();
         } catch (err) {
             console.error('Error sending message:', err);
+        } finally {
+            if (sendBtn) {
+                sendBtn.style.pointerEvents = 'auto';
+                sendBtn.style.opacity = '1';
+                sendBtn.innerHTML = "<i class='bx bxs-send'></i> Send";
+            }
         }
     });
 

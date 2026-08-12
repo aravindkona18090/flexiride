@@ -16,16 +16,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['clear_all'])) {
     $cStmt->execute();
 }
 
-// Mark all as read when visited
-$markStmt = $conn->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
-$markStmt->bind_param("i", $user_id);
-$markStmt->execute();
-
+// Fetch notifications
 $sql = "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 30";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
+
+// Mark all as read when visited
+$markStmt = $conn->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
+$markStmt->bind_param("i", $user_id);
+$markStmt->execute();
 ?>
 
 <!DOCTYPE html>
@@ -72,7 +73,13 @@ $result = $stmt->get_result();
 </head>
 <body>
 
-<?php include_once __DIR__ . '/includes/navbar.php'; ?>
+<?php 
+if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true) {
+    include_once __DIR__ . '/includes/admin_navbar.php';
+} else {
+    include_once __DIR__ . '/includes/navbar.php';
+}
+?>
 
 <div class="container">
     <div class="page-header">
@@ -87,10 +94,18 @@ $result = $stmt->get_result();
 
     <?php if ($result->num_rows > 0): ?>
         <?php while ($notif = $result->fetch_assoc()): ?>
-            <div class="notif-card">
-                <div class="notif-icon"><i class='bx bxs-bell'></i></div>
-                <div class="notif-content">
-                    <h4><?php echo htmlspecialchars($notif['title']); ?></h4>
+            <?php $isUnread = ($notif['is_read'] == 0 || $notif['is_read'] === null); ?>
+            <div class="notif-card" style="<?php echo $isUnread ? 'border-left:4px solid #ef4444; background:rgba(239, 68, 68, 0.08);' : ''; ?>">
+                <div class="notif-icon" style="<?php echo $isUnread ? 'background:rgba(239, 68, 68, 0.2); color:#ef4444;' : ''; ?>">
+                    <i class='bx bxs-bell'></i>
+                </div>
+                <div class="notif-content" style="flex:1;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h4><?php echo htmlspecialchars($notif['title']); ?></h4>
+                        <?php if ($isUnread): ?>
+                            <span style="font-size:11px; padding:3px 8px; border-radius:10px; background:#ef4444; color:white; font-weight:700;">🔴 NEW</span>
+                        <?php endif; ?>
+                    </div>
                     <p><?php echo htmlspecialchars($notif['message']); ?></p>
                     <div class="notif-time">⏰ <?php echo $notif['created_at']; ?></div>
                 </div>

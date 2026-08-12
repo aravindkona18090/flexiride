@@ -11,8 +11,13 @@ $adminRel = $isSubfolder ? '' : 'admin/';
 // Fetch user profile photo and unread notifications if logged in
 $navProfilePhoto = '';
 $navUserName = 'User';
+$navUnreadCount = 0;
+
 if (isset($_SESSION['user_id'])) {
     $uId = $_SESSION['user_id'];
+
+    safeAddColumn($conn, 'notifications', 'is_read', "TINYINT(1) NOT NULL DEFAULT 0");
+
     $userStmt = $conn->prepare("SELECT name, profile_photo FROM users WHERE id = ?");
     if ($userStmt) {
         $userStmt->bind_param("i", $uId);
@@ -26,10 +31,18 @@ if (isset($_SESSION['user_id'])) {
             }
         }
     }
+
+    $nStmt = $conn->prepare("SELECT COUNT(*) as unread FROM notifications WHERE user_id = ? AND (is_read IS NULL OR is_read = 0)");
+    if ($nStmt) {
+        $nStmt->bind_param("i", $uId);
+        $nStmt->execute();
+        $nRes = $nStmt->get_result()->fetch_assoc();
+        $navUnreadCount = (int)($nRes['unread'] ?? 0);
+    }
 }
 ?>
 
-<script src="<?php echo $navRel; ?>assets/js/theme.js"></script>
+<script src="<?php echo $navRel; ?>assets/js/theme.js?v=<?php echo time(); ?>"></script>
 
 <style>
     :root, [data-theme="slate"] {
@@ -150,11 +163,15 @@ if (isset($_SESSION['user_id'])) {
     .nav-links a {
         color: var(--text-muted);
         text-decoration: none;
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 600;
         transition: all 0.3s ease;
         padding: 6px 12px;
         border-radius: 8px;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
     .nav-links a:hover {
         color: var(--primary-color);
@@ -245,6 +262,21 @@ if (isset($_SESSION['user_id'])) {
         color: var(--primary-color) !important;
     }
 
+    .nav-unread-dot {
+        width: 10px;
+        height: 10px;
+        background: #ef4444;
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 8px #ef4444;
+        animation: pulseRedDot 1.5s infinite;
+    }
+    @keyframes pulseRedDot {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
     @keyframes fadeIn { 0% { opacity: 0; transform: translateY(-8px); } 100% { opacity: 1; transform: translateY(0); } }
 
     .mobile-btn { display: none; background: none; border: none; color: var(--text-color); font-size: 24px; cursor: pointer; }
@@ -267,10 +299,6 @@ if (isset($_SESSION['user_id'])) {
     <ul class="nav-links" id="navLinks">
         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
             <li><a href="<?php echo $adminRel; ?>admin_dashboard.php">🛡️ Admin Dashboard</a></li>
-            <li><a href="<?php echo $adminRel; ?>admin_manage_users.php">👥 Users</a></li>
-            <li><a href="<?php echo $adminRel; ?>admin_verify_docs.php">📋 Document Queue</a></li>
-            <li><a href="<?php echo $adminRel; ?>admin_broadcast.php">📢 Broadcast</a></li>
-            <li><a href="<?php echo $adminRel; ?>admin_sos_logs.php">🚨 SOS Logs</a></li>
         <?php else: ?>
             <li><a href="<?php echo $navRel; ?>index.php">🏠 Home</a></li>
             <li><a href="<?php echo $navRel; ?>find_ride.php">Find Ride</a></li>
@@ -279,6 +307,14 @@ if (isset($_SESSION['user_id'])) {
         <?php endif; ?>
 
         <?php if (isset($_SESSION['user_id'])): ?>
+            <li>
+                <a href="<?php echo $navRel; ?>notifications.php" style="position:relative; display:inline-flex; align-items:center; gap:6px;">
+                    🔔 Alerts
+                    <?php if ($navUnreadCount > 0): ?>
+                        <span class="nav-unread-dot" title="<?php echo $navUnreadCount; ?> unread alert(s)"></span>
+                    <?php endif; ?>
+                </a>
+            </li>
             <li>
                 <select id="themeSelector" class="theme-selector" onchange="changeTheme(this.value)">
                     <option value="slate">🌌 Slate Dark</option>
@@ -303,12 +339,22 @@ if (isset($_SESSION['user_id'])) {
                     <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
                         <a href="<?php echo $adminRel; ?>admin_dashboard.php" class="dropdown-item-link" style="color:var(--primary-color) !important; font-weight:700;"><i class='bx bxs-shield-quarter' style="color:var(--primary-color);"></i> 🛡️ Admin Dashboard</a>
                         <a href="<?php echo $adminRel; ?>admin_manage_users.php" class="dropdown-item-link"><i class='bx bxs-user-account' style="color:var(--success-color);"></i> 👥 Manage Users</a>
+                        <a href="<?php echo $adminRel; ?>admin_verify_docs.php" class="dropdown-item-link"><i class='bx bxs-file-find' style="color:#38bdf8;"></i> 📋 Document Queue</a>
+                        <a href="<?php echo $adminRel; ?>admin_broadcast.php" class="dropdown-item-link"><i class='bx bxs-megaphone' style="color:#f59e0b;"></i> 📢 Broadcast Alerts</a>
+                        <a href="<?php echo $adminRel; ?>admin_sos_logs.php" class="dropdown-item-link"><i class='bx bxs-alarm-exclamation' style="color:#ef4444;"></i> 🚨 SOS Logs</a>
                         <div style="border-top:1px solid var(--card-border); margin:5px 0;"></div>
+                        <a href="<?php echo $navRel; ?>profile.php" class="dropdown-item-link"><i class='bx bxs-user-detail' style="color:var(--primary-color);"></i> My Profile</a>
+                    <?php else: ?>
+                        <a href="<?php echo $navRel; ?>profile.php" class="dropdown-item-link"><i class='bx bxs-user-detail' style="color:var(--primary-color);"></i> My Profile</a>
+                        <a href="<?php echo $navRel; ?>myrides.php" class="dropdown-item-link"><i class='bx bxs-notepad' style="color:var(--success-color);"></i> My Offered Rides</a>
+                        <a href="<?php echo $navRel; ?>my_booked_rides.php" class="dropdown-item-link"><i class='bx bxs-receipt' style="color:#818cf8;"></i> My Booked Trips</a>
                     <?php endif; ?>
-                    <a href="<?php echo $navRel; ?>profile.php" class="dropdown-item-link"><i class='bx bxs-user-detail' style="color:var(--primary-color);"></i> My Profile</a>
-                    <a href="<?php echo $navRel; ?>myrides.php" class="dropdown-item-link"><i class='bx bxs-notepad' style="color:var(--success-color);"></i> My Offered Rides</a>
-                    <a href="<?php echo $navRel; ?>my_booked_rides.php" class="dropdown-item-link"><i class='bx bxs-receipt' style="color:#818cf8;"></i> My Booked Trips</a>
-                    <a href="<?php echo $navRel; ?>notifications.php" class="dropdown-item-link"><i class='bx bxs-bell' style="color:#f59e0b;"></i> Activity & Alerts</a>
+                    <a href="<?php echo $navRel; ?>notifications.php" class="dropdown-item-link" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class='bx bxs-bell' style="color:#f59e0b;"></i> Activity & Alerts</span>
+                        <?php if ($navUnreadCount > 0): ?>
+                            <span class="nav-unread-dot" title="<?php echo $navUnreadCount; ?> unread alert(s)"></span>
+                        <?php endif; ?>
+                    </a>
                     <div style="border-top:1px solid var(--card-border); margin:5px 0;"></div>
                     <a href="<?php echo $navRel; ?>logout.php" class="dropdown-item-link" style="color:var(--danger-color) !important;"><i class='bx bx-log-out'></i> Logout</a>
                 </div>

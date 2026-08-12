@@ -50,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $selected_v_json = $_POST['selected_vehicle'] ?? '';
     $vehicle_data    = !empty($selected_v_json) ? json_decode($selected_v_json, true) : ($savedVehiclesList[0] ?? null);
 
-    if ($ride_datetime <= time()) {
+    if ($ride_datetime < (time() - 300)) {
         $error = "Invalid Schedule! Departure date and time must be in the future (greater than current date & time).";
     } elseif (!$vehicle_data) {
         $error = "Please select a vehicle from your garage!";
@@ -205,7 +205,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
-        <form method="POST" id="postRideForm" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot calculate fare while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.style.pointerEvents = 'none'; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Calculating fuel share fare & generating route...`;">
+        <form method="POST" id="postRideForm" onsubmit="const vSel = document.getElementById('vehicleSelect'); if (vSel && !vSel.value) { alert('⚠️ Please select a vehicle from your garage first!'); return false; }">
             <input type="hidden" name="route_distance" id="route_distance" value="25.0">
             <input type="hidden" name="via_route_name" id="via_route_name" value="">
 
@@ -277,8 +277,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="date" name="ride_date" id="ride_date" min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" required>
                 </div>
                 <div class="form-group">
-                    <label>⏰ Departure Time</label>
-                    <input type="time" name="ride_time" id="ride_time" value="<?php echo date('H:i', strtotime('+30 minutes')); ?>" required>
+                    <label>⏰ Departure Time (Must be in future)</label>
+                    <input type="time" name="ride_time" id="ride_time" value="<?php echo date('H:i', strtotime('+1 hour')); ?>" required>
                 </div>
             </div>
 

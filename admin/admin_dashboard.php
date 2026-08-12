@@ -92,7 +92,7 @@ $recentRides = $conn->query("SELECT r.*, u.name as driver_name FROM rides r JOIN
 </head>
 <body>
 
-<?php include_once __DIR__ . '/../includes/navbar.php'; ?>
+<?php include_once __DIR__ . '/../includes/admin_navbar.php'; ?>
 
 <div class="container">
     <div class="header-box">
