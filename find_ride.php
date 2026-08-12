@@ -1,8 +1,8 @@
 <?php
 include_once __DIR__ . '/includes/db.php';
-include_once __DIR__ . '/includes/ai_geo_matcher.php';
-include_once __DIR__ . '/includes/ai_pricing.php';
-include_once __DIR__ . '/includes/ai_safety_score.php';
+include_once __DIR__ . '/includes/geo_utils.php';
+include_once __DIR__ . '/includes/dynamic_pricing.php';
+include_once __DIR__ . '/includes/trust_score.php';
 session_start();
 
 $rides = [];
