@@ -9,7 +9,7 @@ if (!isset($_GET['ride_id'])) {
 
 $ride_id = (int)$_GET['ride_id'];
 
-$sql = "SELECT r.id, r.origin, r.destination, r.ride_date, r.ride_time, r.price, r.vehicle_category, r.vehicle_model, r.helmet_provided, u.name AS posted_user_name, u.phone AS posted_user_phone 
+$sql = "SELECT r.id, r.origin, r.destination, r.ride_date, r.ride_time, r.price, r.vehicle_category, r.vehicle_model, r.helmet_provided, u.name AS posted_user_name, u.phone AS posted_user_phone, u.upi_id AS posted_user_upi
         FROM rides r 
         JOIN users u ON r.user_id = u.id 
         WHERE r.id = ?";
@@ -24,6 +24,7 @@ if ($result->num_rows > 0) {
     echo "Ride not found!";
     exit();
 }
+$driverUpi = !empty($ride['posted_user_upi']) ? $ride['posted_user_upi'] : 'flexiride@upi';
 ?>
 
 <!DOCTYPE html>
@@ -113,9 +114,9 @@ if ($result->num_rows > 0) {
     <div style="background: var(--input-bg); border: 1px solid var(--primary-color); border-radius: 14px; padding: 16px; margin-bottom: 20px; text-align: center;">
         <div style="font-size: 13px; font-weight: 700; color: var(--primary-color); margin-bottom: 8px;">💳 Pay Directly via Any Free UPI App (0% Fees)</div>
         <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-            <a href="upi://pay?pa=7386614044@ybl&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #0284c7; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">Google Pay</a>
-            <a href="upi://pay?pa=7386614044@ybl&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #5f259f; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">PhonePe</a>
-            <a href="upi://pay?pa=7386614044@ybl&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #00baf2; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">Paytm</a>
+            <a href="upi://pay?pa=<?php echo urlencode($driverUpi); ?>&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #0284c7; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">Google Pay</a>
+            <a href="upi://pay?pa=<?php echo urlencode($driverUpi); ?>&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #5f259f; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">PhonePe</a>
+            <a href="upi://pay?pa=<?php echo urlencode($driverUpi); ?>&pn=FlexiRide&am=<?php echo $ride['price']; ?>&cu=INR" style="padding: 8px 14px; background: #00baf2; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;">Paytm</a>
         </div>
     </div>
 

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/resend.php';
+require_once __DIR__ . '/includes/mailer.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
@@ -33,9 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     ";
 
     try {
-
-        sendResendEmail(
-            "rangareddyvenkata734@gmail.com",
+        $adminEmail = getenv('ADMIN_EMAIL') ?: (getenv('SENDER_EMAIL') ?: 'admin@flexiride.com');
+        sendResendMail(
+            $adminEmail,
             "Admin",
             "User Reached Destination",
             $emailBody

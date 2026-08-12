@@ -3,14 +3,14 @@ include_once __DIR__ . '/../includes/db.php';
 session_start();
 require_once __DIR__ . '/../includes/resend.php';
 
-// Ensure user is logged in
-if (!isset($_SESSION['user_id'])) {
+// Ensure user is an admin
+if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../login.php');
     exit();
 }
 
-// Fetch user data from the database
-$user_id = $_SESSION['user_id'];
+// Fetch target user data from the database
+$user_id = isset($_GET['id']) ? (int)$_GET['id'] : (int)$_SESSION['user_id'];
 $query = "SELECT * FROM users WHERE id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $user_id);
