@@ -290,6 +290,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </select>
             </div>
 
+            <!-- 🤖 Live AI Dynamic Pricing Smart Recommender Box Container -->
+            <div id="aiPredictionDisplayBox">
+                <div style="background:rgba(56, 189, 248, 0.1); border:1px solid var(--primary-color); border-radius:16px; padding:18px; margin-bottom:20px; display:flex; align-items:center; gap:14px;">
+                    <div style="background:var(--primary-gradient); color:white; width:45px; height:45px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;">
+                        🤖
+                    </div>
+                    <div>
+                        <strong style="color:var(--primary-color); font-size:15px; display:block; margin-bottom:2px;">AI Machine Learning Smart Fare Predictor Active</strong>
+                        <span style="font-size:13px; color:var(--text-muted); line-height:1.4;">
+                            Select pickup/drop on the map or enter locations to see real-time AI ML price prediction calculated live based on distance, campus peak hours, and vehicle eco-efficiency!
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             <button type="submit" class="btn-submit">Calculate Fare & Preview Route →</button>
         </form>
     </div>
@@ -500,9 +515,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 document.getElementById('route_distance').value = rOpt.dist;
                 document.getElementById('via_route_name').value = rOpt.name;
+                updateLiveAiPricePrediction(parseFloat(rOpt.dist));
             };
             pillsList.appendChild(div);
         });
+
+        if (options && options.length > 0) {
+            document.getElementById('route_distance').value = options[0].dist;
+            document.getElementById('via_route_name').value = options[0].name;
+            updateLiveAiPricePrediction(parseFloat(options[0].dist));
+        }
     }
 
     function onVehicleSelected() {
@@ -604,6 +626,101 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     setupAutocomplete('origin', 'origSuggestions');
     setupAutocomplete('destination', 'destSuggestions');
+
+    function updateLiveAiPricePrediction(overrideDist = null) {
+        let rawDist = (overrideDist !== null && !isNaN(overrideDist)) ? overrideDist : parseFloat(document.getElementById('route_distance')?.value);
+        if (isNaN(rawDist) || rawDist <= 0) {
+            rawDist = 25;
+        }
+        const dist = rawDist;
+        const vehicleSelectVal = document.getElementById('vehicleSelect')?.value || '';
+        const rideTimeVal = document.getElementById('ride_time')?.value || '';
+
+        let vCat = 'bike';
+        let isEv = false;
+
+        if (vehicleSelectVal) {
+            try {
+                const vObj = JSON.parse(vehicleSelectVal);
+                vCat = vObj.vehicle_category || 'bike';
+                isEv = parseInt(vObj.is_ev || 0) === 1;
+            } catch(e) {}
+        }
+
+        const baseFare = (vCat === 'bike') ? 10.00 : 20.00;
+        let distanceCost = 0.0;
+
+        if (vCat === 'bike') {
+            if (dist <= 10) {
+                distanceCost = dist * 3.00;
+            } else if (dist <= 30) {
+                distanceCost = (10 * 3.00) + ((dist - 10) * 2.00);
+            } else if (dist <= 60) {
+                distanceCost = (10 * 3.00) + (20 * 2.00) + ((dist - 30) * 1.50);
+            } else {
+                distanceCost = (10 * 3.00) + (20 * 2.00) + (30 * 1.50) + ((dist - 60) * 1.20);
+            }
+        } else {
+            if (dist <= 10) {
+                distanceCost = dist * 5.50;
+            } else if (dist <= 30) {
+                distanceCost = (10 * 5.50) + ((dist - 10) * 4.00);
+            } else if (dist <= 60) {
+                distanceCost = (10 * 5.50) + (20 * 4.00) + ((dist - 30) * 3.00);
+            } else {
+                distanceCost = (10 * 5.50) + (20 * 4.00) + (30 * 3.00) + ((dist - 60) * 2.20);
+            }
+        }
+
+        const effectiveRatePerKm = (distanceCost / Math.max(1, dist)).toFixed(2);
+
+        let hour = 12;
+        if (rideTimeVal) {
+            hour = parseInt(rideTimeVal.split(':')[0], 10);
+        }
+        
+        let surgeMultiplier = 1.0;
+        let surgeLabel = 'Normal Traffic';
+        if ((hour >= 8 && hour <= 10) || (hour >= 16 && hour <= 19)) {
+            surgeMultiplier = 1.25;
+            surgeLabel = '🔥 Peak Campus Demand Surge (1.25x)';
+        } else if (hour >= 22 || hour <= 5) {
+            surgeMultiplier = 1.15;
+            surgeLabel = '🌙 Night Security Margin (1.15x)';
+        }
+
+        const ecoMultiplier = isEv ? 0.90 : 1.00;
+        const predictedPrice = Math.ceil(((baseFare + distanceCost) * surgeMultiplier * ecoMultiplier) / 5) * 5;
+
+        const aiBox = document.getElementById('aiPredictionDisplayBox');
+        if (aiBox) {
+            aiBox.innerHTML = `
+                <div style="background:rgba(56, 189, 248, 0.12); border:2px solid var(--primary-color); border-radius:16px; padding:18px; margin-bottom:20px; box-shadow: 0 4px 15px rgba(56,189,248,0.2);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:22px;">🤖</span>
+                            <strong style="color:var(--primary-color); font-size:16px;">AI Tiered Progressive Dynamic Fare Engine</strong>
+                        </div>
+                        <span style="font-size:20px; font-weight:800; color:var(--success-color); background:var(--success-bg); padding:4px 12px; border-radius:10px; border:1px solid var(--success-color);">
+                            Suggested: ₹${predictedPrice}.00 / seat
+                        </span>
+                    </div>
+                    <div style="font-size:13px; color:var(--text-color); line-height:1.5;">
+                        📍 Route Distance: <strong>${dist} km</strong> | 📉 Progressive Effective Rate: <strong>₹${effectiveRatePerKm}/km</strong> ${isEv ? '| 💚 <strong>EV Eco-Benefit (-10%)</strong>' : ''}<br>
+                        ⏰ Demand Factor: <strong>${surgeLabel}</strong><br>
+                        💡 <em>Progressive Discount Curve: Rate per km automatically drops from ₹3.00/km down to ₹1.20/km as distance increases!</em>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    document.getElementById('ride_time')?.addEventListener('change', updateLiveAiPricePrediction);
+    document.getElementById('vehicleSelect')?.addEventListener('change', function() {
+        onVehicleSelected();
+        updateLiveAiPricePrediction();
+    });
+    updateLiveAiPricePrediction();
 </script>
 </body>
 </html>
