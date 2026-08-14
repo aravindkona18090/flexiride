@@ -20,6 +20,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_danger_email']))
     $longitude = $_POST['longitude'] ?? 'Unknown';
     $maps_link = "https://www.google.com/maps?q={$latitude},{$longitude}";
 
+    // Always log the SOS event, regardless of email success
+    $sosTitle = '🚨 Emergency SOS Triggered';
+    $sosMsg   = "SOS sent from GPS: {$latitude},{$longitude} — {$maps_link}";
+    $logStmt  = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
+    if ($logStmt) {
+        $logStmt->bind_param("iss", $user_id, $sosTitle, $sosMsg);
+        $logStmt->execute();
+    }
+
     $emergencyEmails = array_filter([$user['emergency_email1'] ?? '', $user['emergency_email2'] ?? '', $user['email'] ?? '']);
 
     foreach ($emergencyEmails as $email) {
@@ -36,7 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_danger_email']))
                 </div>
             </div>
         ";
-        sendResendMail($email, '', '🚨 URGENT: FlexiRide Emergency Alert', $sosHtml);
+        try {
+            sendResendMail($email, '', '🚨 URGENT: FlexiRide Emergency Alert', $sosHtml);
+        } catch (Exception $e) {
+            // Log mailer failure but do NOT block the SOS flow
+            error_log('[FlexiRide SOS] Mailer failed for ' . $email . ': ' . $e->getMessage());
+        }
     }
 
     $_SESSION['alert_message'] = "Emergency alerts & GPS location sent successfully!";

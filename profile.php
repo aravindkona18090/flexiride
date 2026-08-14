@@ -18,17 +18,26 @@ safeAddColumn($conn, 'users', 'is_phone_verified', "TINYINT(1) NOT NULL DEFAULT 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['modal_profile_photo'])) {
     if ($_FILES['modal_profile_photo']['error'] === UPLOAD_ERR_OK) {
         $fileTmpPath = $_FILES['modal_profile_photo']['tmp_name'];
-        $fileName = $_FILES['modal_profile_photo']['name'];
-        $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-        if (in_array($fileExtension, $allowedExtensions)) {
+        // Validate by actual MIME type, not just extension (prevents spoofing)
+        $finfo    = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($fileTmpPath);
+        $allowedMimes = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            'image/gif'  => 'gif',
+        ];
+
+        if (array_key_exists($mimeType, $allowedMimes)) {
+            $ext       = $allowedMimes[$mimeType];
             $uploadDir = __DIR__ . '/uploads/';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
-            $newFileName = 'user_' . $user_id . '_' . time() . '.' . $fileExtension;
-            $destPath = $uploadDir . $newFileName;
+            // Use random ID instead of user-controlled filename
+            $newFileName = bin2hex(random_bytes(16)) . '.' . $ext;
+            $destPath    = $uploadDir . $newFileName;
 
             if (move_uploaded_file($fileTmpPath, $destPath)) {
                 $photoPath = 'uploads/' . $newFileName;
@@ -40,7 +49,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['modal_profile_photo']
                 $errorMsg = "Failed to save uploaded photo.";
             }
         } else {
-            $errorMsg = "Invalid photo format! Please select a JPG, PNG, or WEBP image.";
+            $errorMsg = "Invalid file type. Please upload a JPG, PNG, WEBP, or GIF image.";
         }
     }
 }
