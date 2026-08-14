@@ -11,9 +11,6 @@ $user_id = $_SESSION['user_id'];
 $successMsg = "";
 $errorMsg = "";
 
-// Ensure is_phone_verified column exists in users table
-safeAddColumn($conn, 'users', 'is_phone_verified', "TINYINT(1) NOT NULL DEFAULT 1");
-
 // Handle Photo Upload directly in Profile Popup
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['modal_profile_photo'])) {
     if ($_FILES['modal_profile_photo']['error'] === UPLOAD_ERR_OK) {

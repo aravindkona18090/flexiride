@@ -26,7 +26,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action_user_id'])) {
     elseif ($doc_type === 'upi') $col = 'is_upi_verified';
 
     if (!empty($col)) {
-        safeAddColumn($conn, 'users', $col, "TINYINT(1) NOT NULL DEFAULT 0");
         $stmt = $conn->prepare("UPDATE users SET $col = ? WHERE id = ?");
         $stmt->bind_param("ii", $val, $target_uid);
         if ($stmt->execute()) {

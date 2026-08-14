@@ -1,9 +1,12 @@
 <?php
 /**
  * FlexiRide — Database Connection
- * Single responsibility: connect to MySQL and set charset.
+ * Starts the session (if not already started) and connects to MySQL.
  * Business logic helpers are in includes/db_helpers.php (auto-included below).
  */
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 date_default_timezone_set('Asia/Kolkata');
 
 $host = getenv('MYSQLHOST') ?: (getenv('DB_HOST') ?: 'localhost');
