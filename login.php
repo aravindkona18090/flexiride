@@ -80,7 +80,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $email    = trim($_POST['email']);
         $password = $_POST['password'];
 
-        // Security Throttling & Brute-Force Protection Rate Limiter
+        // Security Throttling Rate Limiter
         $failedAttempts  = $_SESSION['login_failed_count'] ?? 0;
         $lastAttemptTime = $_SESSION['last_login_attempt'] ?? 0;
 
@@ -115,7 +115,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['name']    = $user['name'];
                 
-                // Check if user account has admin privileges
                 if (($user['email'] ?? '') === $adminEmail) {
                     $_SESSION['is_admin'] = true;
                 }
@@ -142,127 +141,111 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login & OTP Verification - FlexiRide</title>
+    <title>Sign In & Register — FlexiRide</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-
-        .auth-container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 40px 20px; }
-        .auth-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--card-border);
-            border-radius: 24px;
-            padding: 40px;
-            max-width: 450px;
-            width: 100%;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
-        }
-
-        .auth-tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 1px solid var(--card-border); padding-bottom: 15px; }
-        .tab-btn {
-            flex: 1; padding: 12px; border: none; background: transparent; color: var(--text-muted);
-            font-size: 16px; font-weight: 600; cursor: pointer; border-radius: 10px; transition: 0.3s;
-        }
-        .tab-btn.active { background: rgba(56, 189, 248, 0.15); color: var(--primary-color); }
-
-        .form-group { margin-bottom: 18px; }
-        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); font-weight: 500; }
-        .form-group input {
-            width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--input-border);
-            background: var(--input-bg); color: var(--text-color); font-size: 15px; outline: none;
-        }
-
-        .btn-auth {
-            width: 100%; padding: 16px; border: none; border-radius: 12px;
-            background: var(--primary-gradient);
-            color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s;
-        }
-        .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4); }
-
-        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; font-size: 14px; }
-        .alert-success { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; font-size: 14px; }
-    </style>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
 </head>
 <body>
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="auth-container">
-    <div class="auth-card">
-        <?php if (!$showOtpStep): ?>
-            <div class="auth-tabs">
-                <button type="button" class="tab-btn active" id="btn-tab-login" onclick="switchAuth('login')">Login</button>
-                <button type="button" class="tab-btn" id="btn-tab-register" onclick="switchAuth('register')">Sign Up & OTP</button>
-            </div>
-        <?php endif; ?>
+<main class="page-content" style="padding: 40px 0; min-height: 80vh; display:flex; align-items:center;">
+    <div class="fr-container-sm">
+        <div class="fr-card" style="max-width: 460px; margin: 0 auto;">
+            <?php if (!$showOtpStep): ?>
+                <div class="vehicle-segmented-tab" style="margin-bottom: 24px;">
+                    <button type="button" class="seg-btn active" id="btn-tab-login" onclick="switchAuth('login')">Login</button>
+                    <button type="button" class="seg-btn" id="btn-tab-register" onclick="switchAuth('register')">Sign Up & OTP</button>
+                </div>
+            <?php endif; ?>
 
-        <?php if ($error): ?>
-            <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
+            <?php if ($error): ?>
+                <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:20px; font-size:14px; font-weight:600;">
+                    ⚠️ <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
 
-        <?php if ($success): ?>
-            <div class="alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
+            <?php if ($success): ?>
+                <div style="background:var(--eco-bg); color:var(--eco); border:1px solid var(--eco-border); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:20px; font-size:14px; font-weight:600;">
+                    ✅ <?php echo htmlspecialchars($success); ?>
+                </div>
+            <?php endif; ?>
 
-        <!-- OTP Verification Step -->
-        <?php if ($showOtpStep): ?>
-            <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot verify while offline!'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> ⏳ Verifying OTP...`;">
-                <input type="hidden" name="action" value="verify_otp">
-                <div style="text-align:center; margin-bottom:20px;">
-                    <i class='bx bxs-envelope-open' style="font-size:48px; color:var(--primary-color);"></i>
-                    <h3 style="font-size:22px; color:var(--text-color); margin-top:10px;">Enter 6-Digit OTP</h3>
-                    <p style="font-size:14px; color:var(--text-muted); margin-top:4px;">Check your email for the verification code.</p>
-                </div>
+            <!-- OTP Verification Step -->
+            <?php if ($showOtpStep): ?>
+                <form method="POST" onsubmit="const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Verifying...`;">
+                    <input type="hidden" name="action" value="verify_otp">
+                    <div style="text-align:center; margin-bottom:20px;">
+                        <i class='bx bxs-envelope-open' style="font-size:48px; color:var(--primary);"></i>
+                        <h3 style="font-size:22px; font-weight:800; color:var(--text-main); margin-top:8px;">Enter 6-Digit OTP</h3>
+                        <p style="font-size:13.5px; color:var(--text-muted); margin-top:4px;">Check your email inbox for the security verification code.</p>
+                    </div>
 
-                <div class="form-group">
-                    <label>6-Digit Verification Code</label>
-                    <input type="text" name="otp_code" placeholder="e.g. 584920" maxlength="6" style="text-align:center; font-size:24px; letter-spacing:8px; font-weight:700;" required>
-                </div>
+                    <div class="fr-form-group">
+                        <label class="fr-label" style="text-align:center;">6-Digit OTP Code</label>
+                        <input type="text" name="otp_code" class="fr-input" placeholder="• • • • • •" maxlength="6" style="text-align:center; font-size:28px; letter-spacing:10px; font-family:monospace; font-weight:800;" required autocomplete="off">
+                    </div>
 
-                <button type="submit" class="btn-auth">Verify OTP & Activate Account →</button>
-            </form>
-        <?php else: ?>
-            <!-- Login Form -->
-            <form method="POST" id="form-login" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot login while offline!'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> ⏳ Authenticating...`;">
-                <input type="hidden" name="action" value="login">
-                <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" name="email" placeholder="name@domain.com" required>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn-auth">Login to Account →</button>
-            </form>
+                    <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg">
+                        Verify & Activate Account <i class='bx bx-check-circle'></i>
+                    </button>
+                </form>
+            <?php else: ?>
+                <!-- Login Form -->
+                <form method="POST" id="form-login" onsubmit="const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Signing in...`;">
+                    <input type="hidden" name="action" value="login">
+                    
+                    <div class="fr-form-group">
+                        <label class="fr-label">Email Address</label>
+                        <input type="email" name="email" class="fr-input" placeholder="name@domain.com" required autocomplete="email">
+                    </div>
+                    
+                    <div class="fr-form-group">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label class="fr-label" style="margin-bottom:0;">Password</label>
+                            <a href="forgot_password.php" style="font-size:12.5px; color:var(--primary); text-decoration:none;">Forgot password?</a>
+                        </div>
+                        <input type="password" name="password" class="fr-input" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
 
-            <!-- Register & Request OTP Form -->
-            <form method="POST" id="form-register" style="display:none;" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot send OTP while offline!'); return false; } const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> ⏳ Dispatching 6-digit OTP...`;">
-                <input type="hidden" name="action" value="send_otp">
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" name="name" placeholder="John Doe" required>
-                </div>
-                <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" name="email" placeholder="name@domain.com" required>
-                </div>
-                <div class="form-group">
-                    <label>Phone Number</label>
-                    <input type="tel" name="phone" placeholder="9876543210" required>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn-auth">Send 6-Digit OTP Verification Code →</button>
-            </form>
-        <?php endif; ?>
+                    <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg" style="margin-top:10px;">
+                        Sign In to FlexiRide <i class='bx bx-right-arrow-alt'></i>
+                    </button>
+                </form>
+
+                <!-- Register & Request OTP Form -->
+                <form method="POST" id="form-register" style="display:none;" onsubmit="const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Dispatching OTP...`;">
+                    <input type="hidden" name="action" value="send_otp">
+                    
+                    <div class="fr-form-group">
+                        <label class="fr-label">Full Name</label>
+                        <input type="text" name="name" class="fr-input" placeholder="e.g. Rahul Sharma" required autocomplete="name">
+                    </div>
+                    
+                    <div class="fr-form-group">
+                        <label class="fr-label">Email Address</label>
+                        <input type="email" name="email" class="fr-input" placeholder="name@domain.com" required autocomplete="email">
+                    </div>
+                    
+                    <div class="fr-form-group">
+                        <label class="fr-label">Mobile Phone Number</label>
+                        <input type="tel" name="phone" class="fr-input" placeholder="10-digit mobile number" required autocomplete="tel">
+                    </div>
+                    
+                    <div class="fr-form-group">
+                        <label class="fr-label">Create Password</label>
+                        <input type="password" name="password" class="fr-input" placeholder="Minimum 6 characters" required autocomplete="new-password">
+                    </div>
+
+                    <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg" style="margin-top:10px;">
+                        Send 6-Digit Email OTP <i class='bx bx-mail-send'></i>
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
     </div>
-</div>
+</main>
 
 <script>
     function switchAuth(type) {
@@ -279,5 +262,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 </script>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

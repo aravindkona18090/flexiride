@@ -1,6 +1,5 @@
 <?php
 include_once __DIR__ . '/includes/db.php';
-session_start();
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -58,9 +57,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Emergency Contact Validation
     if (!empty($emergency_email1) && ($emergency_email1 === $user_primary_email || $emergency_email1 === $college_email)) {
-        $errorMsg = "Emergency Contact Email 1 cannot be the same as your personal or college email address!";
+        $errorMsg = "Emergency Contact Email 1 cannot be your own primary or college email!";
     } elseif (!empty($emergency_email2) && ($emergency_email2 === $user_primary_email || $emergency_email2 === $college_email)) {
-        $errorMsg = "Emergency Contact Email 2 cannot be the same as your personal or college email address!";
+        $errorMsg = "Emergency Contact Email 2 cannot be your own primary or college email!";
     } elseif (!empty($emergency_email1) && !empty($emergency_email2) && $emergency_email1 === $emergency_email2) {
         $errorMsg = "Emergency Contact Email 1 and Email 2 cannot be identical!";
     }
@@ -71,7 +70,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (preg_match('/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/', $upi_id)) {
             $is_upi_valid = 1;
         } else {
-            $errorMsg = "Invalid UPI ID format! Must be like username@okicici or phone@ybl.";
+            $errorMsg = "Invalid UPI ID format! Must be e.g. username@okaxis or 9876543210@ybl.";
         }
     }
 
@@ -81,7 +80,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (isValidAadhaar($aadhaar_number)) {
             $is_aadhaar_valid = 1;
         } else {
-            $errorMsg = "Invalid 12-digit Aadhaar number! Please enter a valid UIDAI Aadhaar.";
+            $errorMsg = "Invalid 12-digit Aadhaar number checksum! Please enter your valid UIDAI number.";
         }
     }
 
@@ -92,7 +91,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (preg_match('/^[A-Z]{2}[0-9]{2}[0-9]{11}$/', $cleanDl)) {
             $is_dl_valid = 1;
         } else {
-            $errorMsg = "Invalid Indian Driving License format! Must be e.g. AP3920210012345 or KA0120200001234.";
+            $errorMsg = "Invalid Indian DL format! Example format: AP3920210012345 or KA0120200001234.";
         }
     }
 
@@ -102,7 +101,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (filter_var($college_email, FILTER_VALIDATE_EMAIL)) {
             $is_college_valid = 1;
         } else {
-            $errorMsg = "Invalid College/Corporate email address!";
+            $errorMsg = "Invalid College or Institute email address format!";
         }
     }
 
@@ -110,8 +109,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $oldPhone = trim($user['phone'] ?? '');
         $is_phone_ver = ($phone === $oldPhone) ? (int)($user['is_phone_verified'] ?? 0) : 0;
 
-        safeAddColumn($conn, 'users', 'is_phone_verified', "TINYINT(1) NOT NULL DEFAULT 0");
-        // Note: safeAddColumn kept here intentionally until next schema migration run
         $update_stmt = $conn->prepare("UPDATE users SET name=?, phone=?, is_phone_verified=?, dob=?, gender=?, upi_id=?, is_upi_verified=?, aadhaar_number=?, is_aadhaar_verified=?, is_verified=?, dl_number=?, is_dl_verified=?, college_email=?, is_college_email_verified=?, campus_name=?, emergency_email1=?, emergency_email2=?, emergency_phone=?, city=? WHERE id=?");
         
         if ($update_stmt) {
@@ -134,209 +131,166 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Profile & Identity Verification - FlexiRide</title>
+    <title>Edit Profile & Trust Credentials — FlexiRide</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-
-        .container { max-width: 800px; margin: 40px auto; padding: 0 20px; width: 100%; }
-        
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .btn-back {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: var(--input-bg); color: var(--primary-color); border: 1px solid var(--primary-color);
-            padding: 10px 18px; border-radius: 12px; font-weight: 600; text-decoration: none; transition: 0.3s;
-        }
-        .btn-back:hover { background: var(--primary-color); color: white; }
-
-        .form-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 35px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-        h2 { font-size: 26px; text-align: center; margin-bottom: 25px; color: var(--text-color); }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-group { margin-bottom: 20px; position: relative; }
-        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); font-weight: 500; }
-        .form-group input, .form-group select {
-            width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--input-border);
-            background: var(--input-bg); color: var(--text-color); font-size: 15px; outline: none;
-        }
-
-        .flex-box { display: flex; gap: 10px; }
-        .btn-verify {
-            padding: 14px 20px; background: var(--success-color); color: white; border: none;
-            border-radius: 10px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.3s;
-        }
-        .btn-verify:hover { opacity: 0.9; }
-        .btn-unlock-edit {
-            padding: 14px 20px; background: var(--input-bg); color: var(--primary-color); border: 1px solid var(--primary-color);
-            border-radius: 10px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.3s;
-        }
-        .btn-unlock-edit:hover { background: rgba(56, 189, 248, 0.2); }
-
-        .status-badge {
-            display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
-        }
-        .badge-valid { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); }
-        .badge-invalid { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); }
-
-        .btn-save {
-            width: 100%; padding: 16px; border: none; border-radius: 12px;
-            background: var(--primary-gradient);
-            color: white; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 15px;
-        }
-        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
-    </style>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
 </head>
 <body>
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="container">
-    <div class="header-bar">
-        <a href="profile.php" class="btn-back"><i class='bx bx-left-arrow-alt' style="font-size:20px;"></i> Back to Profile</a>
+<main class="page-content" style="padding: 30px 0;">
+    <div class="fr-container-sm">
+        <a href="profile.php" class="fr-btn fr-btn-ghost fr-btn-sm" style="margin-bottom:18px;">
+            <i class='bx bx-left-arrow-alt'></i> Back to Profile
+        </a>
+
+        <div class="fr-card">
+            <h2 style="font-size:24px; font-weight:800; color:var(--text-main); margin-bottom:6px;">
+                Edit Profile & Trust Verification
+            </h2>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:24px;">
+                Complete your identity credentials to increase your Trust Score and unlock ride sharing.
+            </p>
+
+            <?php if ($errorMsg): ?>
+                <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px 18px; border-radius:var(--radius-md); margin-bottom:20px; font-weight:600; font-size:14px;">
+                    ⚠️ <?php echo htmlspecialchars($errorMsg); ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST">
+                <div class="fr-grid-2">
+                    <div class="fr-form-group">
+                        <label class="fr-label">Full Name</label>
+                        <input type="text" name="name" class="fr-input" value="<?php echo htmlspecialchars($user['name'] ?? ''); ?>" required>
+                    </div>
+                    <div class="fr-form-group">
+                        <label class="fr-label">Mobile Phone Number</label>
+                        <input type="tel" name="phone" class="fr-input" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" required>
+                    </div>
+                </div>
+
+                <!-- Aadhaar Number Verification -->
+                <div class="fr-form-group">
+                    <label class="fr-label">🛡️ 12-Digit UIDAI Aadhaar Number</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" name="aadhaar_number" id="aadhaar_number" class="fr-input" placeholder="12-digit Aadhaar number" maxlength="12" value="<?php echo htmlspecialchars($user['aadhaar_number'] ?? ''); ?>" <?php if (!empty($user['aadhaar_number']) && ($user['is_aadhaar_verified']??0)) echo 'readonly'; ?> required>
+                        
+                        <?php if (!empty($user['aadhaar_number']) && ($user['is_aadhaar_verified']??0)): ?>
+                            <button type="button" class="fr-btn fr-btn-ghost" id="btn-edit-aadhaar" onclick="unlockField('aadhaar_number', 'btn-verify-aadhaar', 'btn-edit-aadhaar')">✏️ Edit</button>
+                            <button type="button" class="fr-btn fr-btn-primary" id="btn-verify-aadhaar" style="display:none;" onclick="verifyAadhaar()">Verify</button>
+                        <?php else: ?>
+                            <button type="button" class="fr-btn fr-btn-primary" id="btn-verify-aadhaar" onclick="verifyAadhaar()">Verify</button>
+                        <?php endif; ?>
+                    </div>
+                    <div id="aadhaarStatusBadge" style="margin-top:6px; <?php echo ($user['is_aadhaar_verified']??0) ? 'display:block;' : 'display:none;'; ?>">
+                        <?php if ($user['is_aadhaar_verified']??0): ?>
+                            <span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> ✅ Verified UIDAI Aadhaar</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Driving License Verification -->
+                <div class="fr-form-group">
+                    <label class="fr-label">🏍️ Driving License (DL) Number</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" name="dl_number" id="dl_number" class="fr-input" placeholder="e.g. AP39 20210012345" value="<?php echo htmlspecialchars($user['dl_number'] ?? ''); ?>" <?php if (!empty($user['dl_number']) && ($user['is_dl_verified']??0)) echo 'readonly'; ?>>
+                        
+                        <?php if (!empty($user['dl_number']) && ($user['is_dl_verified']??0)): ?>
+                            <button type="button" class="fr-btn fr-btn-ghost" id="btn-edit-dl" onclick="unlockField('dl_number', 'btn-verify-dl', 'btn-edit-dl')">✏️ Edit</button>
+                            <button type="button" class="fr-btn fr-btn-primary" id="btn-verify-dl" style="display:none;" onclick="verifyDl()">Verify</button>
+                        <?php else: ?>
+                            <button type="button" class="fr-btn fr-btn-primary" id="btn-verify-dl" onclick="verifyDl()">Verify</button>
+                        <?php endif; ?>
+                    </div>
+                    <div id="dlStatusBadge" style="margin-top:6px; <?php echo ($user['is_dl_verified']??0) ? 'display:block;' : 'display:none;'; ?>">
+                        <?php if ($user['is_dl_verified']??0): ?>
+                            <span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> ✅ Verified DL</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- UPI Verification -->
+                <div class="fr-form-group">
+                    <label class="fr-label">💳 UPI ID for Direct 0% Fuel Split Transfers</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" name="upi_id" id="upi_id" class="fr-input" placeholder="e.g. yourname@okaxis or phone@ybl" value="<?php echo htmlspecialchars($user['upi_id'] ?? ''); ?>" <?php if (!empty($user['upi_id']) && ($user['is_upi_verified']??0)) echo 'readonly'; ?> required>
+                        
+                        <?php if (!empty($user['upi_id']) && ($user['is_upi_verified']??0)): ?>
+                            <button type="button" class="fr-btn fr-btn-ghost" id="btn-edit-upi" onclick="unlockField('upi_id', 'btn-verify-upi', 'btn-edit-upi')">✏️ Edit</button>
+                            <button type="button" class="fr-btn fr-btn-primary" id="btn-verify-upi" style="display:none;" onclick="verifyUpi()">Verify</button>
+                        <?php else: ?>
+                            <button type="button" class="fr-btn fr-btn-primary" id="btn-verify-upi" onclick="verifyUpi()">Verify</button>
+                        <?php endif; ?>
+                    </div>
+                    <div id="upiStatusBadge" style="margin-top:6px; <?php echo ($user['is_upi_verified']??0) ? 'display:block;' : 'display:none;'; ?>">
+                        <?php if ($user['is_upi_verified']??0): ?>
+                            <span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> ✅ Verified UPI VPA</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <div class="fr-grid-2">
+                    <div class="fr-form-group">
+                        <label class="fr-label">🎓 Campus / University</label>
+                        <input type="text" name="campus_name" class="fr-input" placeholder="e.g. MBU / VIT Campus" value="<?php echo htmlspecialchars($user['campus_name'] ?? ''); ?>">
+                    </div>
+                    <div class="fr-form-group">
+                        <label class="fr-label">📧 Student / Institute Email</label>
+                        <input type="email" name="college_email" class="fr-input" placeholder="student@mbu.asia" value="<?php echo htmlspecialchars($user['college_email'] ?? ''); ?>">
+                    </div>
+                </div>
+
+                <div class="fr-grid-3">
+                    <div class="fr-form-group">
+                        <label class="fr-label">Date of Birth</label>
+                        <input type="date" name="dob" class="fr-input" value="<?php echo htmlspecialchars($user['dob'] ?? ''); ?>">
+                    </div>
+                    <div class="fr-form-group">
+                        <label class="fr-label">Gender</label>
+                        <select name="gender" class="fr-select">
+                            <option value="Male" <?php if(($user['gender']??'')==='Male') echo 'selected'; ?>>Male</option>
+                            <option value="Female" <?php if(($user['gender']??'')==='Female') echo 'selected'; ?>>Female</option>
+                            <option value="Other" <?php if(($user['gender']??'')==='Other') echo 'selected'; ?>>Other</option>
+                        </select>
+                    </div>
+                    <div class="fr-form-group">
+                        <label class="fr-label">City</label>
+                        <input type="text" name="city" class="fr-input" value="<?php echo htmlspecialchars($user['city'] ?? ''); ?>">
+                    </div>
+                </div>
+
+                <!-- Emergency Contacts Section -->
+                <div style="background:var(--bg-input); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px; margin:20px 0;">
+                    <div style="font-size:15px; font-weight:700; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                        <i class='bx bxs-alarm-exclamation' style="color:var(--danger);"></i> Emergency Contacts (For Panic SOS Broadcasts)
+                    </div>
+                    <div class="fr-grid-2">
+                        <div class="fr-form-group">
+                            <label class="fr-label">Emergency Email 1 (Parent/Guardian)</label>
+                            <input type="email" name="emergency_email1" class="fr-input" value="<?php echo htmlspecialchars($user['emergency_email1'] ?? ''); ?>" placeholder="parent@gmail.com">
+                        </div>
+                        <div class="fr-form-group">
+                            <label class="fr-label">Emergency Email 2 (Campus Roommate)</label>
+                            <input type="email" name="emergency_email2" class="fr-input" value="<?php echo htmlspecialchars($user['emergency_email2'] ?? ''); ?>" placeholder="friend@gmail.com">
+                        </div>
+                    </div>
+                    <div class="fr-form-group" style="margin-bottom:0;">
+                        <label class="fr-label">Emergency Contact Phone Number</label>
+                        <input type="tel" name="emergency_phone" class="fr-input" value="<?php echo htmlspecialchars($user['emergency_phone'] ?? ''); ?>" placeholder="10-digit mobile number">
+                    </div>
+                </div>
+
+                <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg">
+                    Save Profile & Credentials <i class='bx bx-save'></i>
+                </button>
+            </form>
+        </div>
     </div>
-
-    <div class="form-card">
-        <h2>✏️ Edit Profile & Identity Verification</h2>
-
-        <?php if ($errorMsg): ?>
-            <div class="alert-error"><?php echo htmlspecialchars($errorMsg); ?></div>
-        <?php endif; ?>
-
-        <form method="POST">
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" name="name" value="<?php echo htmlspecialchars($user['name'] ?? ''); ?>" required>
-                </div>
-                <div class="form-group">
-                    <label>Phone Number</label>
-                    <input type="tel" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" required>
-                </div>
-            </div>
-
-            <!-- Aadhaar Number Verification -->
-            <div class="form-group">
-                <label>🛡️ 12-Digit UIDAI Aadhaar Number</label>
-                <div class="flex-box">
-                    <input type="text" name="aadhaar_number" id="aadhaar_number" placeholder="Enter 12-digit Aadhaar number" maxlength="12" value="<?php echo htmlspecialchars($user['aadhaar_number'] ?? ''); ?>" <?php if (!empty($user['aadhaar_number']) && ($user['is_aadhaar_verified']??0)) echo 'readonly'; ?> required>
-                    
-                    <?php if (!empty($user['aadhaar_number']) && ($user['is_aadhaar_verified']??0)): ?>
-                        <button type="button" class="btn-unlock-edit" id="btn-edit-aadhaar" onclick="unlockField('aadhaar_number', 'btn-verify-aadhaar', 'btn-edit-aadhaar')">✏️ Edit</button>
-                        <button type="button" class="btn-verify" id="btn-verify-aadhaar" style="display:none;" onclick="verifyAadhaar()">Verify Math</button>
-                    <?php else: ?>
-                        <button type="button" class="btn-verify" id="btn-verify-aadhaar" onclick="verifyAadhaar()">Verify Math</button>
-                    <?php endif; ?>
-                </div>
-                <div class="status-badge" id="aadhaarStatusBadge" style="<?php echo ($user['is_aadhaar_verified']??0) ? 'display:inline-block;' : 'display:none;'; ?>">
-                    <?php if ($user['is_aadhaar_verified']??0): ?>
-                        <span class="badge-valid"><i class='bx bxs-check-shield'></i> ✅ Verified UIDAI Aadhaar</span>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Driving License Verification -->
-            <div class="form-group">
-                <label>🏍️ Indian Driving License (DL) Number</label>
-                <div class="flex-box">
-                    <input type="text" name="dl_number" id="dl_number" placeholder="e.g. AP39 20210012345" value="<?php echo htmlspecialchars($user['dl_number'] ?? ''); ?>" <?php if (!empty($user['dl_number']) && ($user['is_dl_verified']??0)) echo 'readonly'; ?>>
-                    
-                    <?php if (!empty($user['dl_number']) && ($user['is_dl_verified']??0)): ?>
-                        <button type="button" class="btn-unlock-edit" id="btn-edit-dl" onclick="unlockField('dl_number', 'btn-verify-dl', 'btn-edit-dl')">✏️ Edit</button>
-                        <button type="button" class="btn-verify" id="btn-verify-dl" style="display:none;" onclick="verifyDl()">Verify DL</button>
-                    <?php else: ?>
-                        <button type="button" class="btn-verify" id="btn-verify-dl" onclick="verifyDl()">Verify DL</button>
-                    <?php endif; ?>
-                </div>
-                <div class="status-badge" id="dlStatusBadge" style="<?php echo ($user['is_dl_verified']??0) ? 'display:inline-block;' : 'display:none;'; ?>">
-                    <?php if ($user['is_dl_verified']??0): ?>
-                        <span class="badge-valid"><i class='bx bxs-check-shield'></i> ✅ Verified DL</span>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- UPI Verification Box -->
-            <div class="form-group">
-                <label>💳 UPI ID (Google Pay / PhonePe / Paytm)</label>
-                <div class="flex-box">
-                    <input type="text" name="upi_id" id="upi_id" placeholder="username@okicici or phone@ybl" value="<?php echo htmlspecialchars($user['upi_id'] ?? ''); ?>" <?php if (!empty($user['upi_id']) && ($user['is_upi_verified']??0)) echo 'readonly'; ?> required>
-                    
-                    <?php if (!empty($user['upi_id']) && ($user['is_upi_verified']??0)): ?>
-                        <button type="button" class="btn-unlock-edit" id="btn-edit-upi" onclick="unlockField('upi_id', 'btn-verify-upi', 'btn-edit-upi')">✏️ Edit</button>
-                        <button type="button" class="btn-verify" id="btn-verify-upi" style="display:none;" onclick="verifyUpi()">Verify UPI</button>
-                    <?php else: ?>
-                        <button type="button" class="btn-verify" id="btn-verify-upi" onclick="verifyUpi()">Verify UPI</button>
-                    <?php endif; ?>
-                </div>
-                <div class="status-badge" id="upiStatusBadge" style="<?php echo ($user['is_upi_verified']??0) ? 'display:inline-block;' : 'display:none;'; ?>">
-                    <?php if ($user['is_upi_verified']??0): ?>
-                        <span class="badge-valid"><i class='bx bxs-check-shield'></i> ✅ Verified VPA</span>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- College / Corporate Verification -->
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>🎓 Campus / University Name</label>
-                    <input type="text" name="campus_name" placeholder="e.g. MBU Campus / VIT" value="<?php echo htmlspecialchars($user['campus_name'] ?? ''); ?>">
-                </div>
-                <div class="form-group">
-                    <label>📧 College / Corporate Email</label>
-                    <input type="email" name="college_email" placeholder="student@mbu.asia" value="<?php echo htmlspecialchars($user['college_email'] ?? ''); ?>">
-                </div>
-            </div>
-
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Date of Birth</label>
-                    <input type="date" name="dob" value="<?php echo htmlspecialchars($user['dob'] ?? ''); ?>">
-                </div>
-                <div class="form-group">
-                    <label>Gender</label>
-                    <select name="gender">
-                        <option value="Male" <?php if(($user['gender']??'')==='Male') echo 'selected'; ?>>Male</option>
-                        <option value="Female" <?php if(($user['gender']??'')==='Female') echo 'selected'; ?>>Female</option>
-                        <option value="Other" <?php if(($user['gender']??'')==='Other') echo 'selected'; ?>>Other</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>City</label>
-                <input type="text" name="city" value="<?php echo htmlspecialchars($user['city'] ?? ''); ?>">
-            </div>
-
-            <h3 style="font-size:18px; margin:15px 0; color:var(--primary-color);">🚨 Emergency Contacts (Must be different from your account email)</h3>
-
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Emergency Email 1 (Parent / Guardian)</label>
-                    <input type="email" name="emergency_email1" value="<?php echo htmlspecialchars($user['emergency_email1'] ?? ''); ?>">
-                </div>
-                <div class="form-group">
-                    <label>Emergency Email 2 (Friend / Relative)</label>
-                    <input type="email" name="emergency_email2" value="<?php echo htmlspecialchars($user['emergency_email2'] ?? ''); ?>">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Emergency Phone</label>
-                <input type="tel" name="emergency_phone" value="<?php echo htmlspecialchars($user['emergency_phone'] ?? ''); ?>">
-            </div>
-
-            <button type="submit" class="btn-save">Save Profile Changes</button>
-        </form>
-    </div>
-</div>
+</main>
 
 <script>
     function unlockField(inputId, verifyBtnId, editBtnId) {
@@ -375,11 +329,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const badge = document.getElementById('aadhaarStatusBadge');
 
         if (validateAadhaarVerhoeff(num)) {
-            badge.style.display = 'inline-block';
-            badge.innerHTML = `<span class="badge-valid"><i class='bx bxs-check-shield'></i> ✅ Valid UIDAI Aadhaar Verified!</span>`;
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> ✅ Valid UIDAI Aadhaar Verified!</span>`;
         } else {
-            badge.style.display = 'inline-block';
-            badge.innerHTML = `<span class="badge-invalid"><i class='bx bxs-x-circle'></i> Invalid 12-digit Aadhaar Number!</span>`;
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="fr-badge fr-badge-danger"><i class='bx bxs-x-circle'></i> Invalid 12-digit Aadhaar Number!</span>`;
         }
     }
 
@@ -388,11 +342,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const badge = document.getElementById('dlStatusBadge');
 
         if (/^[A-Z]{2}[0-9]{2}[0-9]{11}$/.test(dl)) {
-            badge.style.display = 'inline-block';
-            badge.innerHTML = `<span class="badge-valid"><i class='bx bxs-check-shield'></i> ✅ Valid DL Verified!</span>`;
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> ✅ Valid DL Verified!</span>`;
         } else {
-            badge.style.display = 'inline-block';
-            badge.innerHTML = `<span class="badge-invalid"><i class='bx bxs-x-circle'></i> Invalid DL Format!</span>`;
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="fr-badge fr-badge-danger"><i class='bx bxs-x-circle'></i> Invalid DL Format!</span>`;
         }
     }
 
@@ -401,13 +355,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const badge = document.getElementById('upiStatusBadge');
 
         if (/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upi)) {
-            badge.style.display = 'inline-block';
-            badge.innerHTML = `<span class="badge-valid"><i class='bx bxs-check-shield'></i> ✅ Valid VPA Verified!</span>`;
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> ✅ Valid VPA Verified!</span>`;
         } else {
-            badge.style.display = 'inline-block';
-            badge.innerHTML = `<span class="badge-invalid"><i class='bx bxs-x-circle'></i> Invalid UPI format!</span>`;
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="fr-badge fr-badge-danger"><i class='bx bxs-x-circle'></i> Invalid UPI format!</span>`;
         }
     }
 </script>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>
