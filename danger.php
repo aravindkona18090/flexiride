@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_danger_email']))
     $longitude = $_POST['longitude'] ?? 'Unknown';
     $maps_link = "https://www.google.com/maps?q={$latitude},{$longitude}";
 
-    // Always log the SOS event, regardless of email success
+    // Always log the SOS event
     $sosTitle = '🚨 Emergency SOS Triggered';
     $sosMsg   = "SOS sent from GPS: {$latitude},{$longitude} — {$maps_link}";
     $logStmt  = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
@@ -48,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_danger_email']))
         try {
             sendResendMail($email, '', '🚨 URGENT: FlexiRide Emergency Alert', $sosHtml);
         } catch (Exception $e) {
-            // Log mailer failure but do NOT block the SOS flow
             error_log('[FlexiRide SOS] Mailer failed for ' . $email . ': ' . $e->getMessage());
         }
     }
@@ -64,149 +63,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_danger_email']))
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Emergency SOS - FlexiRide</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Emergency SOS & Safety Protocol — FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: #0f172a; color: #fff; min-height: 100vh; display: flex; flex-direction: column; }
-        .navbar {
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 15px 30px;
+        .sos-beacon-ring {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.15);
+            border: 2px solid var(--danger);
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: center;
+            font-size: 46px;
+            color: var(--danger);
+            margin: 0 auto 20px;
+            box-shadow: 0 0 35px rgba(239, 68, 68, 0.4);
+            animation: sosPulse 1.5s infinite;
         }
-        .logo { font-size: 24px; font-weight: 700; color: #38bdf8; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        .logo span { color: #22c55e; }
-        .nav-links { display: flex; gap: 20px; list-style: none; }
-        .nav-links a { color: #94a3b8; text-decoration: none; font-size: 16px; font-weight: 500; transition: 0.3s; }
-        .nav-links a:hover { color: #38bdf8; }
 
-        .container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .sos-card {
-            background: rgba(30, 41, 59, 0.9);
-            border: 2px solid #ef4444;
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 480px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 0 40px rgba(239, 68, 68, 0.4);
-        }
-        .sos-icon { font-size: 64px; color: #ef4444; margin-bottom: 15px; animation: pulse 1.5s infinite; }
-        h2 { font-size: 26px; color: #f8fafc; margin-bottom: 10px; }
-        p { color: #94a3b8; font-size: 15px; margin-bottom: 25px; }
-        .btn-sos {
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 12px;
-            background: #ef4444;
-            color: white;
-            font-size: 18px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        .btn-sos:hover { background: #dc2626; transform: scale(1.02); }
-        .btn-whatsapp {
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 12px;
-            background: #22c55e;
-            color: white;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+        @keyframes sosPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 18px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
     </style>
 </head>
 <body>
 
-<nav class="navbar">
-    <a href="index.php" class="logo"><i class='bx bxs-navigation'></i> Flexi<span>Ride</span></a>
-    <ul class="nav-links">
-        <li><a href="index.php">Home</a></li>
-        <li><a href="find_ride.php">Find Ride</a></li>
-        <li><a href="post_ride.php">Post Ride</a></li>
-        <li><a href="myrides.php">My Rides</a></li>
-        <li><a href="my_booked_rides.php">Booked Trips</a></li>
-        <li><a href="profile.php">Profile</a></li>
-        <li><a href="logout.php">Logout</a></li>
-    </ul>
-</nav>
+<?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="container">
-    <div class="sos-card">
-        <i class='bx bxs-error-circle sos-icon'></i>
-        <h2>EMERGENCY ASSISTANCE</h2>
-        <p>Transmit your live GPS coordinates immediately to your emergency contacts & WhatsApp.</p>
+<main class="page-content" style="padding: 40px 0;">
+    <div class="fr-container-sm">
+        <div class="fr-card" style="max-width: 520px; margin: 0 auto; text-align: center; border-color: var(--danger);">
+            <div class="sos-beacon-ring">
+                <i class='bx bxs-alarm-exclamation'></i>
+            </div>
 
-        <button onclick="triggerSOS()" class="btn-sos"><i class='bx bxs-bell-ring'></i> Send Emergency Email Alert</button>
-        <a id="whatsapp-sos" href="#" target="_blank" class="btn-whatsapp"><i class='bx bxl-whatsapp'></i> Share GPS via WhatsApp</a>
+            <span class="fr-badge fr-badge-danger" style="margin-bottom: 8px;"><i class='bx bxs-error'></i> Panic Protocol Active</span>
+            <h2 style="font-size: 26px; font-weight: 800; color: var(--danger); margin-bottom: 8px;">
+                Emergency Assistance
+            </h2>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 22px; line-height: 1.5;">
+                Pressing the button below instantly broadcasts your precise live GPS coordinates to your registered emergency contacts and campus safety desk.
+            </p>
+
+            <form method="POST" id="sosForm">
+                <input type="hidden" name="send_danger_email" value="1">
+                <input type="hidden" name="latitude" id="latInput" value="">
+                <input type="hidden" name="longitude" id="longInput" value="">
+
+                <div id="gpsStatus" style="background:var(--bg-input); padding:10px 14px; border-radius:var(--radius-md); font-size:13px; color:var(--text-muted); margin-bottom:20px;">
+                    <i class='bx bx-radar bx-spin'></i> Acquiring GPS satellite lock...
+                </div>
+
+                <button type="submit" id="sosBtn" class="fr-btn fr-btn-danger fr-btn-block fr-btn-lg" style="box-shadow:0 8px 25px rgba(239, 68, 68, 0.4); margin-bottom:14px;">
+                    <i class='bx bxs-alarm-exclamation'></i> Send Instant SOS Alert Now
+                </button>
+            </form>
+
+            <div style="display:flex; justify-content:center; gap:12px; margin-top:14px;">
+                <a href="tel:112" class="fr-btn fr-btn-ghost fr-btn-sm" style="color:var(--danger);">
+                    <i class='bx bxs-phone-call'></i> Call 112 (National Helpline)
+                </a>
+                <a href="index.php" class="fr-btn fr-btn-ghost fr-btn-sm">
+                    Cancel & Return
+                </a>
+            </div>
+        </div>
     </div>
-</div>
+</main>
 
 <script>
-    let currentLat = 'Unknown';
-    let currentLng = 'Unknown';
-
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            currentLat = pos.coords.latitude;
-            currentLng = pos.coords.longitude;
-
-            const mapsLink = `https://www.google.com/maps?q=${currentLat},${currentLng}`;
-            const text = encodeURIComponent(`🚨 EMERGENCY! I need help. My current GPS location: ${mapsLink}`);
-            document.getElementById('whatsapp-sos').href = `https://wa.me/?text=${text}`;
-        });
-    }
-
-    function triggerSOS() {
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '';
-
-        var latInp = document.createElement('input');
-        latInp.type = 'hidden';
-        latInp.name = 'latitude';
-        latInp.value = currentLat;
-        form.appendChild(latInp);
-
-        var lngInp = document.createElement('input');
-        lngInp.type = 'hidden';
-        lngInp.name = 'longitude';
-        lngInp.value = currentLng;
-        form.appendChild(lngInp);
-
-        var sendBtn = document.createElement('input');
-        sendBtn.type = 'hidden';
-        sendBtn.name = 'send_danger_email';
-        sendBtn.value = '1';
-        form.appendChild(sendBtn);
-
-        document.body.appendChild(form);
-        form.submit();
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                document.getElementById('latInput').value = pos.coords.latitude;
+                document.getElementById('longInput').value = pos.coords.longitude;
+                document.getElementById('gpsStatus').innerHTML = `<i class='bx bx-check-circle' style='color:var(--eco);'></i> <strong>GPS Locked:</strong> ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+            },
+            function(err) {
+                document.getElementById('gpsStatus').innerHTML = `<i class='bx bx-info-circle' style='color:var(--amber);'></i> <strong>GPS Permission Required</strong> (Will send available network coordinates)`;
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
+        );
     }
 </script>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>
