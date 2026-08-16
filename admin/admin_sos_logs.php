@@ -20,79 +20,56 @@ $sosLogs = $conn->query("SELECT n.*, u.name as user_name, u.email as user_email,
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Emergency SOS Control Center - Admin FlexiRide</title>
+    <title>Emergency SOS Audit Logs — Admin FlexiRide</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-
-        .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; width: 100%; }
-
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        .header-box h2 { font-size: 26px; color: var(--text-color); display: flex; align-items: center; gap: 10px; }
-        .btn-back { background: var(--input-bg); color: var(--text-color); border: 1px solid var(--card-border); padding: 10px 18px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px; }
-
-        .card { background: var(--card-bg); border: 1px solid var(--danger-color); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(239,68,68,0.2); }
-
-        .sos-item {
-            background: var(--input-bg);
-            border: 1px solid var(--danger-color);
-            border-radius: 14px;
-            padding: 20px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .badge-sos { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
-    </style>
+    <link rel="stylesheet" href="../assets/css/flexiride.css">
 </head>
 <body>
 
 <?php include_once __DIR__ . '/../includes/admin_navbar.php'; ?>
 
-<div class="container">
-    <div class="header-box">
-        <h2>🚨 Emergency SOS Safety Control Center</h2>
-        <div>
-            <a href="admin_dashboard.php" class="btn-back"><i class='bx bx-left-arrow-alt'></i> Back to Dashboard</a>
+<main class="page-content" style="padding: 30px 0;">
+    <div class="fr-container">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+            <div>
+                <h1 style="font-size:26px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                    <i class='bx bxs-alarm-exclamation' style="color:var(--danger);"></i> Emergency SOS Audit Trail
+                </h1>
+                <p style="font-size:14px; color:var(--text-muted);">Real-time dispatch audit logs with GPS coordinates and timestamps.</p>
+            </div>
+            <a href="admin_dashboard.php" class="fr-btn fr-btn-ghost fr-btn-sm"><i class='bx bx-left-arrow-alt'></i> Operations Console</a>
+        </div>
+
+        <div class="fr-card" style="border-color:var(--danger-border);">
+            <?php if ($sosLogs && $sosLogs->num_rows > 0): ?>
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    <?php while ($log = $sosLogs->fetch_assoc()): ?>
+                        <div style="background:var(--bg-input); border:1px solid var(--danger-border); border-radius:var(--radius-md); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                            <div>
+                                <span class="fr-badge fr-badge-danger" style="margin-bottom:6px;"><i class='bx bxs-error'></i> <?php echo htmlspecialchars($log['title']); ?></span>
+                                <h4 style="font-size:15.5px; font-weight:700; color:var(--text-main); margin-bottom:4px;">
+                                    Rider: <?php echo htmlspecialchars($log['user_name']); ?> (📞 <?php echo htmlspecialchars($log['user_phone']); ?>)
+                                </h4>
+                                <p style="font-size:13.5px; color:var(--text-muted); line-height:1.45;"><?php echo htmlspecialchars($log['message']); ?></p>
+                                <span style="font-size:11.5px; color:var(--text-muted); margin-top:6px; display:block;">
+                                    📅 Timestamp: <?php echo $log['created_at']; ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+            <?php else: ?>
+                <div style="text-align:center; padding:40px 20px;">
+                    <i class='bx bxs-shield-check' style="font-size:48px; color:var(--eco); margin-bottom:10px; display:block;"></i>
+                    <h3 style="font-size:18px; font-weight:700; color:var(--text-main); margin-bottom:4px;">Zero Active SOS Incidents</h3>
+                    <p style="font-size:14px; color:var(--text-muted);">All campus commute routes are safe and running normally.</p>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
+</main>
 
-    <div class="card">
-        <h3 style="font-size:18px; margin-bottom:20px; color:var(--danger-color); display:flex; align-items:center; gap:8px;">
-            <i class='bx bxs-alarm-exclamation'></i> Real-Time Emergency SOS Logs
-        </h3>
-
-        <?php if ($sosLogs && $sosLogs->num_rows > 0): ?>
-            <?php while ($log = $sosLogs->fetch_assoc()): ?>
-                <div class="sos-item">
-                    <div>
-                        <span class="badge-sos"><i class='bx bxs-error'></i> <?php echo htmlspecialchars($log['title']); ?></span>
-                        <h4 style="margin:10px 0 4px; font-size:16px;">
-                            Rider: <?php echo htmlspecialchars($log['user_name']); ?> (📞 <?php echo htmlspecialchars($log['user_phone']); ?>)
-                        </h4>
-                        <p style="font-size:14px; color:var(--text-muted);"><?php echo htmlspecialchars($log['message']); ?></p>
-                        <span style="font-size:12px; color:var(--text-muted); margin-top:6px; display:block;">
-                            📅 Timestamp: <?php echo $log['created_at']; ?>
-                        </span>
-                    </div>
-                    <div>
-                        <a href="../danger.php" style="background:#ef4444; color:white; padding:8px 16px; border-radius:10px; text-decoration:none; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
-                            <i class='bx bxs-map-pin'></i> Inspect Location
-                        </a>
-                    </div>
-                </div>
-            <?php endwhile; ?>
-        <?php else: ?>
-            <div style="text-align:center; padding:30px; color:var(--text-muted);">
-                <i class='bx bxs-shield-check' style="font-size:45px; color:var(--success-color); margin-bottom:10px; display:block;"></i>
-                <p style="font-size:15px; font-weight:600; color:var(--success-color);">All Clear! No emergency SOS incidents logged.</p>
-            </div>
-        <?php endif; ?>
-    </div>
-</div>
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

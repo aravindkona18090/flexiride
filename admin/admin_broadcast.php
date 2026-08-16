@@ -16,7 +16,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['broadcast_title'])) {
     $message = trim($_POST['broadcast_message']);
 
     if (!empty($title) && !empty($message)) {
-        // Dispatch to all users in notifications table
         $allUsers = $conn->query("SELECT id FROM users");
         $count = 0;
         if ($allUsers) {
@@ -38,75 +37,59 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['broadcast_title'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Broadcast System Announcement - Admin FlexiRide</title>
+    <title>Global Notification Broadcast — Admin FlexiRide</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-
-        .container { max-width: 750px; margin: 40px auto; padding: 0 20px; width: 100%; }
-
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        .header-box h2 { font-size: 26px; color: var(--text-color); display: flex; align-items: center; gap: 10px; }
-        .btn-back { background: var(--input-bg); color: var(--text-color); border: 1px solid var(--card-border); padding: 10px 18px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px; }
-
-        .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-size: 14px; font-weight: 600; color: var(--text-color); margin-bottom: 8px; }
-        .form-group input, .form-group textarea {
-            width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--input-border);
-            background: var(--input-bg); color: var(--text-color); outline: none; font-size: 15px;
-        }
-
-        .btn-broadcast {
-            width: 100%; padding: 16px; border: none; border-radius: 12px;
-            background: var(--primary-gradient); color: white; font-size: 16px; font-weight: 700;
-            cursor: pointer; transition: 0.3s; display: flex; justify-content: center; align-items: center; gap: 8px;
-        }
-
-        .alert-success { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
-        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
-    </style>
+    <link rel="stylesheet" href="../assets/css/flexiride.css">
 </head>
 <body>
 
 <?php include_once __DIR__ . '/../includes/admin_navbar.php'; ?>
 
-<div class="container">
-    <div class="header-box">
-        <h2>📢 Send Global Broadcast Alert</h2>
-        <div>
-            <a href="admin_dashboard.php" class="btn-back"><i class='bx bx-left-arrow-alt'></i> Back to Dashboard</a>
+<main class="page-content" style="padding: 30px 0;">
+    <div class="fr-container-sm">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+            <div>
+                <h1 style="font-size:24px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                    <i class='bx bxs-megaphone' style="color:var(--primary);"></i> Global Broadcast Dispatcher
+                </h1>
+                <p style="font-size:14px; color:var(--text-muted);">Send real-time alerts to the notification hubs of all registered commuters.</p>
+            </div>
+            <a href="admin_dashboard.php" class="fr-btn fr-btn-ghost fr-btn-sm"><i class='bx bx-left-arrow-alt'></i> Operations Console</a>
+        </div>
+
+        <?php if ($successMsg): ?>
+            <div style="background:var(--eco-bg); color:var(--eco); border:1px solid var(--eco-border); padding:12px 18px; border-radius:var(--radius-md); margin-bottom:20px; font-weight:600;">
+                ✅ <?php echo htmlspecialchars($successMsg); ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($errorMsg): ?>
+            <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px 18px; border-radius:var(--radius-md); margin-bottom:20px; font-weight:600;">
+                ⚠️ <?php echo htmlspecialchars($errorMsg); ?>
+            </div>
+        <?php endif; ?>
+
+        <div class="fr-card">
+            <form method="POST">
+                <div class="fr-form-group">
+                    <label class="fr-label">Broadcast Headline</label>
+                    <input type="text" name="broadcast_title" class="fr-input" placeholder="e.g. 🌟 Weekend Tech Fest Commute Corridor or Weather Alert" required>
+                </div>
+
+                <div class="fr-form-group">
+                    <label class="fr-label">Announcement Content</label>
+                    <textarea name="broadcast_message" class="fr-textarea" rows="5" placeholder="Write message to be delivered to all user inboxes..." required></textarea>
+                </div>
+
+                <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg">
+                    Dispatch Global Alert <i class='bx bxs-megaphone'></i>
+                </button>
+            </form>
         </div>
     </div>
+</main>
 
-    <?php if ($successMsg): ?>
-        <div class="alert-success"><?php echo htmlspecialchars($successMsg); ?></div>
-    <?php endif; ?>
-
-    <?php if ($errorMsg): ?>
-        <div class="alert-error"><?php echo htmlspecialchars($errorMsg); ?></div>
-    <?php endif; ?>
-
-    <div class="card">
-        <h3 style="font-size:18px; margin-bottom:20px; color:var(--primary-color);">📣 Send Announcement Alert to All Users</h3>
-
-        <form method="POST">
-            <div class="form-group">
-                <label>Announcement Title *</label>
-                <input type="text" name="broadcast_title" placeholder="e.g. 🌟 New Safety Update or Weekend Festival Offer" required>
-            </div>
-
-            <div class="form-group">
-                <label>Message Content *</label>
-                <textarea name="broadcast_message" rows="5" placeholder="Write your announcement details here..." required></textarea>
-            </div>
-
-            <button type="submit" class="btn-broadcast"><i class='bx bxs-megaphone'></i> Broadcast to All Users →</button>
-        </form>
-    </div>
-</div>
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>
