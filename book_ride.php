@@ -2,6 +2,7 @@
 session_start();
 include_once __DIR__ . '/includes/db.php';
 include_once __DIR__ . '/includes/mailer.php';
+include_once __DIR__ . '/includes/trust_score.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -18,7 +19,7 @@ $current_user_id = $_SESSION['user_id'];
 $successMessage = "";
 $errorMessage = "";
 
-$rideStmt = $conn->prepare("SELECT r.*, u.name as driver_name, u.email as driver_email, u.phone as driver_phone FROM rides r JOIN users u ON r.user_id = u.id WHERE r.id = ?");
+$rideStmt = $conn->prepare("SELECT r.*, u.name as driver_name, u.email as driver_email, u.phone as driver_phone, u.profile_photo as driver_photo FROM rides r JOIN users u ON r.user_id = u.id WHERE r.id = ?");
 $rideStmt->bind_param("i", $ride_id);
 $rideStmt->execute();
 $ride = $rideStmt->get_result()->fetch_assoc();
@@ -27,6 +28,8 @@ if (!$ride) {
     echo "Ride not found.";
     exit();
 }
+
+$trustInfo = calculateRiderAiSafetyScore($conn, (int)$ride['user_id']);
 
 $userStmt = $conn->prepare("SELECT email, name, phone FROM users WHERE id = ?");
 $userStmt->bind_param("i", $current_user_id);
@@ -115,75 +118,117 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Ride - FlexiRide</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Book Your Seat — FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-        .container {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 40px 20px;
-            width: 100%;
-        }
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 480px;
-            width: 100%;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        }
-        .tag { display: inline-block; background: var(--success-bg); color: var(--success-color); padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; margin-bottom: 15px; }
-        h2 { font-size: 24px; margin-bottom: 15px; text-align: center; color: var(--text-color); }
-        .info-box { background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; padding: 20px; margin: 20px 0; }
-        .info-box p { margin-bottom: 10px; color: var(--text-muted); font-size: 15px; }
-        .btn-confirm { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary-gradient); color: white; font-weight: 600; font-size: 16px; cursor: pointer; transition: 0.3s; }
-        .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(22, 163, 74, 0.4); }
-        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
-    </style>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
 </head>
 <body>
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="container">
-    <div class="card">
-        <div style="text-align: center;">
-            <span class="tag">🏍️ <?php echo strtoupper($ride['vehicle_category'] ?? 'BIKE'); ?> RIDE</span>
-        </div>
-        <h2>Book Your Seat</h2>
-
-        <?php if ($errorMessage): ?>
-            <div class="alert-error"><?php echo htmlspecialchars($errorMessage); ?></div>
-        <?php endif; ?>
-
-        <div class="info-box">
-            <p><strong>Driver:</strong> <?php echo htmlspecialchars($ride['driver_name']); ?></p>
-            <p><strong>Route:</strong> <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></p>
-            <p><strong>Date & Time:</strong> <?php echo htmlspecialchars($ride['ride_date']); ?> at <?php echo htmlspecialchars($ride['ride_time']); ?></p>
-            <p><strong>Vehicle:</strong> <?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_type']); ?></p>
-            <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
-                <p><strong>Spare Helmet:</strong> <?php echo ($ride['helmet_provided'] ?? 1) ? '🪖 Provided' : 'Bring Own'; ?></p>
-            <?php endif; ?>
-            <p><strong>Price per Seat:</strong> <span style="color:var(--success-color); font-weight:700; font-size:18px;">₹<?php echo htmlspecialchars($ride['price']); ?></span></p>
-        </div>
-
-        <form method="POST" onsubmit="if (!navigator.onLine) { alert('⚠️ Cannot book while offline! Please check your internet connection.'); return false; } const btn = this.querySelector('button[type=submit]'); btn.style.pointerEvents = 'none'; btn.style.opacity = '0.85'; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin' style='font-size:18px;'></i> ⏳ Securing seat & notifying driver...`;">
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-            <div style="margin-bottom: 20px;">
-                <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select Seats to Book</label>
-                <input type="number" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" style="width:100%; padding:14px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:16px; outline:none;" required>
+<main class="page-content" style="padding: 40px 0;">
+    <div class="fr-container-sm">
+        <div class="fr-card" style="max-width: 560px; margin: 0 auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <span class="fr-badge fr-badge-primary">
+                    <?php echo (($ride['vehicle_category'] ?? 'bike') === 'bike') ? '<i class="bx bx-cycling"></i> TWO-WHEELER POOL' : '<i class="bx bxs-car"></i> CAR SHARING'; ?>
+                </span>
+                <span class="trust-shield <?php echo $trustInfo['badge_class']; ?>">
+                    <i class='bx bxs-shield-check'></i> <?php echo $trustInfo['score']; ?>% Verified
+                </span>
             </div>
-            <button type="submit" class="btn-confirm">Confirm Seat Booking Now</button>
-        </form>
-    </div>
-</div>
 
+            <h2 style="font-size:24px; font-weight:800; color:var(--text-main); margin-bottom:8px;">
+                Reserve Your Seat
+            </h2>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">
+                Direct fuel cost split. Free cancellation before departure.
+            </p>
+
+            <?php if ($errorMessage): ?>
+                <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:18px; font-size:14px; font-weight:600;">
+                    <i class='bx bx-error-circle'></i> <?php echo htmlspecialchars($errorMessage); ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Driver & Vehicle Details -->
+            <div style="background:var(--bg-input); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:16px; margin-bottom:18px;">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+                    <?php if (!empty($ride['driver_photo'])): ?>
+                        <img src="<?php echo htmlspecialchars($ride['driver_photo']); ?>" style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--primary);" alt="Driver">
+                    <?php else: ?>
+                        <div style="width:44px; height:44px; border-radius:50%; background:var(--primary-gradient); color:white; display:flex; align-items:center; justify-content:center; font-size:20px;">
+                            <i class='bx bxs-user'></i>
+                        </div>
+                    <?php endif; ?>
+                    <div>
+                        <div style="font-size:15px; font-weight:700; color:var(--text-main);"><?php echo htmlspecialchars($ride['driver_name']); ?></div>
+                        <div style="font-size:12.5px; color:var(--text-muted);">Vehicle: <strong><?php echo htmlspecialchars($ride['vehicle_model'] ?: $ride['vehicle_category']); ?></strong></div>
+                    </div>
+                </div>
+
+                <!-- Wayfinder Route Recap -->
+                <div class="wayfinder-route" style="margin: 10px 0;">
+                    <div class="route-stop origin">
+                        <div class="stop-beacon"></div>
+                        <div class="stop-label">Pickup</div>
+                        <div class="stop-name"><?php echo htmlspecialchars($ride['origin']); ?></div>
+                    </div>
+                    <div class="route-stop destination">
+                        <div class="stop-beacon"></div>
+                        <div class="stop-label">Dropoff</div>
+                        <div class="stop-name"><?php echo htmlspecialchars($ride['destination']); ?></div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--text-muted); border-top:1px solid var(--border-subtle); padding-top:10px; margin-top:10px;">
+                    <div>📅 <?php echo htmlspecialchars($ride['ride_date']); ?> at <?php echo htmlspecialchars($ride['ride_time']); ?></div>
+                    <?php if (($ride['vehicle_category'] ?? 'bike') === 'bike'): ?>
+                        <div>🪖 <?php echo ($ride['helmet_provided'] ?? 1) ? 'Spare Helmet Provided' : 'Bring Own Helmet'; ?></div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Booking Form -->
+            <form method="POST" onsubmit="const btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Securing Seat...`;">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+
+                <div class="fr-form-group">
+                    <label class="fr-label">Number of Seats to Reserve</label>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <input type="number" id="seats_booked" name="seats_booked" value="1" min="1" max="<?php echo htmlspecialchars($ride['seats_available']); ?>" class="fr-input" style="font-size:18px; font-weight:700;" onchange="updateTotal(this.value, <?php echo (float)$ride['price']; ?>)" required>
+                        <span style="font-size:13px; color:var(--text-muted); white-space:nowrap;">Max <?php echo htmlspecialchars($ride['seats_available']); ?> seat(s) available</span>
+                    </div>
+                </div>
+
+                <div class="fair-fare-meter" style="margin-bottom: 20px;">
+                    <div>
+                        <div class="fare-subtext">Total Contribution</div>
+                        <div class="fare-amount" id="totalPriceDisplay">₹<?php echo htmlspecialchars($ride['price']); ?></div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="fr-badge fr-badge-eco"><i class='bx bxs-lock-alt'></i> Escrow Held</span>
+                        <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">Released on Trip OTP Confirmation</div>
+                    </div>
+                </div>
+
+                <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg">
+                    Confirm Seat Reservation <i class='bx bx-check-circle'></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</main>
+
+<script>
+    function updateTotal(qty, unitPrice) {
+        const count = Math.max(1, parseInt(qty) || 1);
+        const total = count * unitPrice;
+        document.getElementById('totalPriceDisplay').textContent = '₹' + total.toFixed(0);
+    }
+</script>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>
