@@ -1,7 +1,7 @@
 <?php
 include_once __DIR__ . '/../includes/db.php';
+include_once __DIR__ . '/../includes/mailer.php';
 session_start();
-require_once __DIR__ . '/../includes/resend.php';
 
 // Ensure user is an admin
 if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
@@ -9,7 +9,6 @@ if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     exit();
 }
 
-// Fetch target user data from the database
 $user_id = isset($_GET['id']) ? (int)$_GET['id'] : (int)$_SESSION['user_id'];
 $query = "SELECT * FROM users WHERE id = ?";
 $stmt = $conn->prepare($query);
@@ -23,6 +22,8 @@ if ($result->num_rows > 0) {
     $user = [];
 }
 
+$errorMessage = "";
+
 // Handle form submission to update profile
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name = trim($_POST['name']);
@@ -31,64 +32,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $emergency_email1 = trim($_POST['emergency_email1']);
     $emergency_email2 = trim($_POST['emergency_email2']);
 
-    // Update user information
-    $update_query = "UPDATE users 
-                     SET name = ?, email = ?, phone = ?, emergency_email1 = ?, emergency_email2 = ? 
-                     WHERE id = ?";
-
+    $update_query = "UPDATE users SET name = ?, email = ?, phone = ?, emergency_email1 = ?, emergency_email2 = ? WHERE id = ?";
     $update_stmt = $conn->prepare($update_query);
-    $update_stmt->bind_param(
-        "sssssi",
-        $name,
-        $email,
-        $phone,
-        $emergency_email1,
-        $emergency_email2,
-        $user_id
-    );
+    $update_stmt->bind_param("sssssi", $name, $email, $phone, $emergency_email1, $emergency_email2, $user_id);
 
     if ($update_stmt->execute()) {
-
         $emailBody = "
-        <h2>Profile Updated Successfully</h2>
-
-        <p>Dear <strong>{$name}</strong>,</p>
-
-        <p>Your FlexiRide profile has been updated successfully.</p>
-
-        <p><strong>Updated Details:</strong></p>
-
-        <ul>
-            <li><strong>Name:</strong> {$name}</li>
-            <li><strong>Email:</strong> {$email}</li>
-            <li><strong>Phone:</strong> {$phone}</li>
-            <li><strong>Emergency Email 1:</strong> {$emergency_email1}</li>
-            <li><strong>Emergency Email 2:</strong> {$emergency_email2}</li>
-        </ul>
-
-        <p>If you did not make these changes, please contact our support team immediately.</p>
-
-        <br>
-
-        <p>Thank you,<br>
-        <strong>FlexiRide Team</strong></p>
+            <h2>FlexiRide Account Updated</h2>
+            <p>Dear <strong>" . htmlspecialchars($name) . "</strong>,</p>
+            <p>Your FlexiRide commuter profile was updated by system operations.</p>
         ";
-
         try {
-            sendResendEmail(
-                $email,
-                $name,
-                "Profile Updated Successfully",
-                $emailBody
-            );
+            sendResendMail($email, $name, "FlexiRide Profile Updated", $emailBody);
         } catch (Exception $e) {
-            error_log("Resend Email Error: " . $e->getMessage());
+            error_log("Email Error: " . $e->getMessage());
         }
 
         header("Location: admin_manage_users.php?message=User profile updated successfully!");
         exit();
     } else {
-        $message = "Error updating profile.";
+        $errorMessage = "Error updating profile: " . $conn->error;
     }
 }
 ?>
@@ -97,214 +60,70 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit User Profile</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Sofadi+One&display=swap" rel="stylesheet">
-    <style>body {
-    background-image: url("images/edit.jpg");
-            background-repeat: no-repeat; 
-            background-size: cover; 
-            background-position: center;
-            background-attachment: fixed;
-    font-family: "Josefin Sans", sans-serif;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    overflow: hidden;
-    font-size: large;
-}
-
-/* Container for Form */
-.edit-profile-container {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter:blur(10px);
-    width: 90%;
-    max-width: 500px;  /* Reduced width for smaller form */
-    padding: 30px;  /* Reduced padding */
-    border-radius: 10px;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-    opacity: 0;  /* Initially hidden */
-    animation: fadeInOpacity 1s ease-in-out forwards; /* Apply the opacity transition */
-}
-
-/* Title Styling */
-h2 {
-    text-align: center;
-    color: #333;;  /* Reduced font size */
-    font-weight: 600;
-    margin-bottom: 15px;  /* Reduced margin */
-}
-
-/* Input Fields Styling */
-label {  /* Smaller font size */
-    color: #333;
-    display: block;
-    margin: 8px 0 5px;  /* Reduced margins */
-    font-family: 'Josefin Sans', sans-serif;
-    font-weight: 500;
-}
-
-input[type="email"], input[type="text"] {
-    width: 98%;
-    padding: 8px 12px;  /* Reduced padding */
-    margin-bottom: 15px;  /* Reduced margin */
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    background-color: #f9f9f9; /* Reduced font size */
-    font-family: 'Josefin Sans', sans-serif;
-    transition: border 0.3s ease, box-shadow 0.3s ease;
-    font-size: large;
-}
-
-input[type="email"]:focus, input[type="text"]:focus {
-    outline: none;
-    border: 1px solid #4a4a8a;
-    box-shadow: 0 0 10px rgba(74, 74, 138, 0.3);
-}
-
-/* Button Styling */
-button[type="submit"] {
-    font-family: "Josefin Sans", sans-serif;
-    background: linear-gradient(135deg, #4a4a8a, #6767b3);
-    color: white;
-    border: none;
-    padding: 10px;
-    border-radius: 10px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 95%;
-    position: relative;
-    overflow: hidden;
-}
-
-button[type="submit"]:hover {
-    background: linear-gradient(135deg, #6767b3, #4a4a8a);
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 5px 20px rgba(74, 74, 138, 0.5);
-}
-
-button[type="submit"]:active {
-    transform: translateY(1px);
-    background: #39396b;
-}
-
-/* Button Ripple Effect */
-button[type="submit"]::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 0;
-    height: 0;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    transition: width 0.5s ease, height 0.5s ease, opacity 0.3s ease;
-    z-index: 1;
-}
-
-button[type="submit"]:hover::after {
-    width: 200%;
-    height: 500%;
-    opacity: 0;
-}
-
-/* Simple Opacity Animation */
-@keyframes fadeInOpacity {
-    0% {
-        opacity: 0;
-    }
-    100% {
-        opacity: 1;
-    }
-}
-
-/* Focus Effects */
-input[type="email"]:focus + label,
-input[type="text"]:focus + label {
-    color: #4a4a8a;
-    font-family: "Josefin Sans", sans-serif;
-    transform: translateY(-10px);
-}
-
-/* General Text Styling for Form */
-p {  /* Smaller font size */
-    color: #666;
-    text-align: center;
-    margin-top: 20px;
-    font-family: 'Josefin Sans', sans-serif;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    .edit-profile-container {
-        padding: 15px;
-    }
-
-    h2 {
-        font-size: 24px;  /* Adjusted font size for smaller screens */
-    }
-
-    button[type="submit"] {
-        padding: 10px;  /* Reduced padding for buttons on small screens */
-    }
-}
-.back-home-btn {
-            display: inline-block;
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            padding: 10px 20px;
-            font-size: 1rem;
-            font-weight: bold;
-            color: #fff;
-            background-color: #3498db;
-            text-decoration: none;
-            border-radius: 5px;
-            text-align: center;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .back-home-btn:hover {
-            background-color: #2c3e50;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-        }
-
-    </style>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>Edit Commuter Profile — Admin FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="../assets/css/flexiride.css">
 </head>
 <body>
+
 <?php include_once __DIR__ . '/../includes/admin_navbar.php'; ?>
-<div class="edit-profile-container">
-    <h2>Edit User Profile</h2>
-    <form action="admin_edit_user.php" method="POST">
-        <label for="name">Full Name:</label>
-        <input type="text" id="name" name="name" value="<?php echo isset($user['name']) ? htmlspecialchars($user['name']) : ''; ?>" required><br><br>
 
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" value="<?php echo isset($user['email']) ? htmlspecialchars($user['email']) : ''; ?>" required><br><br>
+<main class="page-content" style="padding: 30px 0;">
+    <div class="fr-container-sm">
+        <a href="admin_manage_users.php" class="fr-btn fr-btn-ghost fr-btn-sm" style="margin-bottom:18px;">
+            <i class='bx bx-left-arrow-alt'></i> Back to Users Directory
+        </a>
 
-        <label for="phone">Phone Number:</label>
-        <input type="text" id="phone" name="phone" value="<?php echo isset($user['phone']) ? htmlspecialchars($user['phone']) : ''; ?>" required><br><br>
+        <div class="fr-card" style="max-width: 560px; margin: 0 auto;">
+            <h2 style="font-size:22px; font-weight:800; color:var(--text-main); margin-bottom:6px;">
+                Edit Commuter Account
+            </h2>
+            <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:20px;">
+                Modify contact details and emergency routing for user #<?php echo $user_id; ?>
+            </p>
 
-        <label for="emergency_email1">Emergency Email 1:</label>
-        <input type="email" id="emergency_email1" name="emergency_email1" value="<?php echo isset($user['emergency_email1']) ? htmlspecialchars($user['emergency_email1']) : ''; ?>" required><br><br>
+            <?php if ($errorMessage): ?>
+                <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:20px; font-size:14px;">
+                    ⚠️ <?php echo htmlspecialchars($errorMessage); ?>
+                </div>
+            <?php endif; ?>
 
-        <label for="emergency_email2">Emergency Email 2:</label>
-        <input type="email" id="emergency_email2" name="emergency_email2" value="<?php echo isset($user['emergency_email2']) ? htmlspecialchars($user['emergency_email2']) : ''; ?>" required><br><br>
+            <form method="POST">
+                <div class="fr-form-group">
+                    <label class="fr-label">Full Name</label>
+                    <input type="text" name="name" class="fr-input" value="<?php echo htmlspecialchars($user['name'] ?? ''); ?>" required>
+                </div>
 
-        <button type="submit">Update Profile</button>
-    </form>
-</div>
+                <div class="fr-form-group">
+                    <label class="fr-label">Email Address</label>
+                    <input type="email" name="email" class="fr-input" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
+                </div>
 
-<a href="admin_manage_users.php" class="back-home-btn">Back to Users List</a>
+                <div class="fr-form-group">
+                    <label class="fr-label">Mobile Phone</label>
+                    <input type="tel" name="phone" class="fr-input" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" required>
+                </div>
+
+                <div class="fr-grid-2">
+                    <div class="fr-form-group">
+                        <label class="fr-label">Emergency Email 1</label>
+                        <input type="email" name="emergency_email1" class="fr-input" value="<?php echo htmlspecialchars($user['emergency_email1'] ?? ''); ?>">
+                    </div>
+                    <div class="fr-form-group">
+                        <label class="fr-label">Emergency Email 2</label>
+                        <input type="email" name="emergency_email2" class="fr-input" value="<?php echo htmlspecialchars($user['emergency_email2'] ?? ''); ?>">
+                    </div>
+                </div>
+
+                <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg">
+                    Save Changes <i class='bx bx-save'></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</main>
+
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>
