@@ -37,7 +37,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
     exit();
 }
 
-$rideStmt = $conn->prepare("SELECT r.*, u.name as driver_name, u.email as driver_email FROM rides r JOIN users u ON r.user_id = u.id WHERE r.id = ?");
+$rideStmt = $conn->prepare("SELECT r.*, u.name as driver_name, u.email as driver_email, u.profile_photo as driver_photo FROM rides r JOIN users u ON r.user_id = u.id WHERE r.id = ?");
 $rideStmt->bind_param("i", $ride_id);
 $rideStmt->execute();
 $ride = $rideStmt->get_result()->fetch_assoc();
@@ -84,6 +84,10 @@ $messagesStmt = $conn->prepare("SELECT m.*, u.name as sender_name FROM messages 
 $messagesStmt->bind_param("i", $ride_id);
 $messagesStmt->execute();
 $messagesRes = $messagesStmt->get_result();
+
+$isOwner = ($user_id == $ride['user_id']);
+$backUrl = $isOwner ? 'myrides.php' : 'my_booked_rides.php';
+$backText = $isOwner ? 'Back to Offered Rides' : 'Back to Booked Trips';
 ?>
 
 <!DOCTYPE html>
@@ -91,246 +95,195 @@ $messagesRes = $messagesStmt->get_result();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Trip Chat - FlexiRide</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Live Trip Chat — FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-        
-        .chat-container {
-            max-width: 780px;
-            margin: 30px auto;
-            width: 100%;
-            padding: 0 20px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-window-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--card-border);
-            border-radius: 24px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        .chat-app-box {
+            max-width: 820px;
+            margin: 20px auto;
+            border-radius: var(--radius-xl);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             overflow: hidden;
+            box-shadow: var(--shadow-lg);
             display: flex;
             flex-direction: column;
-            flex: 1;
+            height: 75vh;
+            min-height: 520px;
         }
-        .chat-header {
-            background: var(--card-bg);
-            padding: 20px 25px;
-            border-bottom: 1px solid var(--card-border);
+
+        .chat-app-header {
+            padding: 16px 22px;
+            background: var(--bg-surface-elevated);
+            border-bottom: 1px solid var(--border-subtle);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .messages-box {
-            background: var(--input-bg);
-            border-bottom: 1px solid var(--card-border);
+
+        .chat-msg-stream {
             flex: 1;
-            min-height: 400px;
-            max-height: 520px;
             overflow-y: auto;
-            padding: 25px;
+            padding: 22px;
+            background: var(--bg-input);
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
-        .msg {
-            max-width: 75%;
+
+        .msg-bubble {
+            max-width: 72%;
             padding: 12px 18px;
-            border-radius: 16px;
-            font-size: 15px;
-            line-height: 1.4;
+            border-radius: 18px;
+            font-size: 14.5px;
+            line-height: 1.45;
             position: relative;
-            animation: fadeIn 0.3s ease;
+            word-wrap: break-word;
         }
-        .msg-sent {
+
+        .msg-bubble.sent {
             align-self: flex-end;
             background: var(--primary-gradient);
-            color: white;
+            color: #ffffff;
             border-bottom-right-radius: 4px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
         }
-        .msg-received {
+
+        .msg-bubble.received {
             align-self: flex-start;
-            background: var(--card-bg);
-            color: var(--text-color);
-            border: 1px solid var(--card-border);
+            background: var(--bg-surface);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
             border-bottom-left-radius: 4px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-sm);
         }
-        .msg-meta {
-            font-size: 11px;
-            opacity: 0.75;
-            margin-top: 4px;
-            text-align: right;
-        }
-        .chat-input-form {
+
+        .chat-app-input {
+            padding: 16px 20px;
+            background: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
             display: flex;
             gap: 12px;
-            background: var(--card-bg);
-            padding: 20px;
         }
-        .chat-input-form input {
-            flex: 1;
-            padding: 14px 18px;
-            border-radius: 12px;
-            border: 1px solid var(--input-border);
-            background: var(--input-bg);
-            color: var(--text-color);
-            font-size: 15px;
-            outline: none;
-        }
-        .btn-send {
-            background: var(--primary-gradient);
-            color: white;
-            border: none;
-            padding: 14px 24px;
-            border-radius: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex; align-items: center; gap: 6px;
-        }
-        .btn-send:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
-
-        .live-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--success-color); }
-        .live-dot { width: 8px; height: 8px; background: var(--success-color); border-radius: 50%; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="chat-container">
-    <div class="chat-window-card">
-        <div class="chat-header">
-            <div>
-                <h3 style="font-size:18px; color:var(--text-color);"><?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></h3>
-                <span style="font-size:13px; color:#94a3b8;">Driver: <strong><?php echo htmlspecialchars($ride['driver_name']); ?></strong></span>
-                <div class="live-status" style="margin-left:12px;"><div class="live-dot"></div> Live Polling Active</div>
-            </div>
-            <?php 
-                $isOwner = ($user_id == $ride['user_id']);
-                $backUrl = $isOwner ? 'myrides.php' : 'my_booked_rides.php';
-                $backText = $isOwner ? 'Back to Offered Rides' : 'Back to Booked Trips';
-            ?>
-            <a href="<?php echo $backUrl; ?>" style="color:var(--primary-color); text-decoration:none; font-size:14px; font-weight:600;"><i class='bx bx-left-arrow-alt'></i> <?php echo $backText; ?></a>
-        </div>
-
-        <div class="messages-box" id="msgBox">
-            <?php if ($messagesRes->num_rows == 0): ?>
-                <p id="emptyTxt" style="text-align:center; color:#94a3b8; margin-top:40px;">No messages yet. Send a message to coordinate pickup!</p>
-            <?php else: ?>
-                <?php while ($m = $messagesRes->fetch_assoc()): ?>
-                    <div class="msg <?php echo ($m['sender_id'] == $user_id) ? 'msg-sent' : 'msg-received'; ?>">
-                        <div style="font-size:12px; font-weight:600; margin-bottom:2px;"><?php echo htmlspecialchars($m['sender_name']); ?></div>
-                        <?php echo htmlspecialchars($m['message']); ?>
-                        <div class="msg-meta"><?php echo date('H:i', strtotime($m['sent_at'])); ?></div>
+<main class="page-content" style="padding: 20px 0;">
+    <div class="fr-container">
+        <div class="chat-app-box">
+            <!-- Header -->
+            <div class="chat-app-header">
+                <div>
+                    <div style="font-size:16px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                        <span>📍 <?php echo htmlspecialchars($ride['origin']); ?> ➔ <?php echo htmlspecialchars($ride['destination']); ?></span>
                     </div>
-                <?php endwhile; ?>
-            <?php endif; ?>
-        </div>
+                    <div style="font-size:12.5px; color:var(--text-muted); display:flex; align-items:center; gap:10px; margin-top:2px;">
+                        <span>Driver: <strong><?php echo htmlspecialchars($ride['driver_name']); ?></strong></span>
+                        <span class="fr-badge fr-badge-eco" style="font-size:11px; padding:2px 8px;"><i class='bx bxs-circle'></i> Live Channel</span>
+                    </div>
+                </div>
 
-        <form class="chat-input-form" id="chatForm">
-            <input type="text" id="msgInput" name="message" placeholder="Type a message..." required autocomplete="off">
-            <button type="submit" id="chatSendBtn" class="btn-send"><i class='bx bxs-send'></i> Send</button>
-        </form>
+                <a href="<?php echo $backUrl; ?>" class="fr-btn fr-btn-ghost fr-btn-sm">
+                    <i class='bx bx-left-arrow-alt'></i> <?php echo $backText; ?>
+                </a>
+            </div>
+
+            <!-- Messages Stream -->
+            <div class="chat-msg-stream" id="msgBox">
+                <?php if ($messagesRes->num_rows == 0): ?>
+                    <div id="emptyTxt" style="text-align:center; padding:50px 20px; color:var(--text-muted);">
+                        <i class='bx bx-chat' style="font-size:36px; color:var(--primary); margin-bottom:8px;"></i>
+                        <p style="font-size:14px;">No messages yet. Send a note to coordinate pickup spot and timings!</p>
+                    </div>
+                <?php else: ?>
+                    <?php while ($m = $messagesRes->fetch_assoc()): ?>
+                        <div class="msg-bubble <?php echo ($m['sender_id'] == $user_id) ? 'sent' : 'received'; ?>">
+                            <div style="font-size:11.5px; font-weight:700; opacity:0.85; margin-bottom:3px;">
+                                <?php echo htmlspecialchars($m['sender_name']); ?>
+                            </div>
+                            <?php echo htmlspecialchars($m['message']); ?>
+                            <div style="font-size:10.5px; opacity:0.7; text-align:right; margin-top:4px;">
+                                <?php echo date('H:i', strtotime($m['sent_at'])); ?>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
+                <?php endif; ?>
+            </div>
+
+            <!-- Input Bar -->
+            <form class="chat-app-input" id="chatForm">
+                <input type="text" id="msgInput" name="message" class="fr-input" placeholder="Type a message to driver or passengers..." required autocomplete="off">
+                <button type="submit" id="chatSendBtn" class="fr-btn fr-btn-primary" style="padding:0 24px;">
+                    <i class='bx bxs-send'></i> Send
+                </button>
+            </form>
+        </div>
     </div>
-</div>
+</main>
 
 <script>
     const msgBox = document.getElementById('msgBox');
     const chatForm = document.getElementById('chatForm');
     const msgInput = document.getElementById('msgInput');
     const rideId = <?php echo $ride_id; ?>;
-    let lastMsgCount = 0;
+    const currentUserId = <?php echo $user_id; ?>;
 
     function scrollToBottom() {
         msgBox.scrollTop = msgBox.scrollHeight;
     }
     scrollToBottom();
 
-    // Auto-Polling for New Messages every 2 seconds
-    async function fetchMessages() {
-        try {
-            const res = await fetch(`chat.php?action=fetch_messages&ride_id=${rideId}`);
-            const data = await res.json();
-            if (data.status === 'success') {
-                if (data.messages.length !== lastMsgCount) {
-                    lastMsgCount = data.messages.length;
-                    renderMessages(data.messages);
-                }
-            }
-        } catch (e) {
-            console.error('Live chat poll error:', e);
-        }
-    }
-
-    function renderMessages(messages) {
-        if (messages.length === 0) return;
-        msgBox.innerHTML = '';
-        messages.forEach(m => {
-            const div = document.createElement('div');
-            div.className = `msg ${m.is_me ? 'msg-sent' : 'msg-received'}`;
-            div.innerHTML = `
-                <div style="font-size:12px; font-weight:600; margin-bottom:2px;">${escapeHtml(m.sender_name)}</div>
-                ${escapeHtml(m.message)}
-                <div class="msg-meta">${m.sent_time}</div>
-            `;
-            msgBox.appendChild(div);
-        });
-        scrollToBottom();
-    }
-
-    function escapeHtml(text) {
-        return text.replace(/[&<>"']/g, function(m) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-        });
-    }
-
-    // Instant Send without Page Reload
-    chatForm.addEventListener('submit', async (e) => {
+    // AJAX Form Submission
+    chatForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const text = msgInput.value.trim();
         if (!text) return;
 
-        const sendBtn = document.getElementById('chatSendBtn');
-        if (sendBtn) {
-            sendBtn.style.pointerEvents = 'none';
-            sendBtn.style.opacity = '0.7';
-            sendBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Sending...";
-        }
-
-        const formData = new FormData();
-        formData.append('message', text);
-        formData.append('ajax', '1');
-
         msgInput.value = '';
-        try {
-            await fetch(`chat.php?ride_id=${rideId}`, {
-                method: 'POST',
-                body: formData
-            });
-            await fetchMessages();
-        } catch (err) {
-            console.error('Error sending message:', err);
-        } finally {
-            if (sendBtn) {
-                sendBtn.style.pointerEvents = 'auto';
-                sendBtn.style.opacity = '1';
-                sendBtn.innerHTML = "<i class='bx bxs-send'></i> Send";
-            }
-        }
+        fetch(`chat.php?ride_id=${rideId}&ajax=1`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `message=${encodeURIComponent(text)}`
+        }).then(r => r.json()).then(data => {
+            fetchMessages();
+        });
     });
 
-    // Poll every 2 seconds
-    setInterval(fetchMessages, 2000);
+    // Background Poll
+    function fetchMessages() {
+        fetch(`chat.php?ride_id=${rideId}&action=fetch_messages`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success' && data.messages) {
+                    if (data.messages.length > 0) {
+                        const emptyTxt = document.getElementById('emptyTxt');
+                        if (emptyTxt) emptyTxt.remove();
+                    }
+                    msgBox.innerHTML = '';
+                    data.messages.forEach(m => {
+                        const isMe = (m.sender_id == currentUserId);
+                        const bubble = document.createElement('div');
+                        bubble.className = `msg-bubble ${isMe ? 'sent' : 'received'}`;
+                        bubble.innerHTML = `
+                            <div style="font-size:11.5px; font-weight:700; opacity:0.85; margin-bottom:3px;">${m.sender_name}</div>
+                            ${m.message}
+                            <div style="font-size:10.5px; opacity:0.7; text-align:right; margin-top:4px;">${m.sent_time}</div>
+                        `;
+                        msgBox.appendChild(bubble);
+                    });
+                    scrollToBottom();
+                }
+            }).catch(e => console.error(e));
+    }
+
+    setInterval(fetchMessages, 3500);
 </script>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

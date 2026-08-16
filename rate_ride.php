@@ -9,8 +9,6 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 $ride_id = isset($_GET['ride_id']) ? (int)$_GET['ride_id'] : 0;
-
-// Fix: Support both reviewed_id and driver_id parameters
 $reviewed_id = isset($_GET['reviewed_id']) ? (int)$_GET['reviewed_id'] : (isset($_GET['driver_id']) ? (int)$_GET['driver_id'] : 0);
 
 $successMessage = "";
@@ -35,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateUser->bind_param("di", $newAvg, $reviewed_id);
             $updateUser->execute();
 
-            $successMessage = "Rating submitted successfully!";
+            $successMessage = "Thank you! Your rating and review have been recorded.";
         } else {
             $errorMessage = "Rating error: " . $conn->error;
         }
@@ -50,66 +48,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rate Trip & Rider - FlexiRide</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Rate Trip & Driver Experience — FlexiRide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-        .container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 480px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        .star-box {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            font-size: 38px;
+            color: var(--text-muted);
+            margin: 20px 0;
+            cursor: pointer;
         }
-        h2 { font-size: 24px; margin-bottom: 10px; color: var(--text-color); }
-        .star-rating { display: flex; justify-content: center; gap: 10px; font-size: 32px; color: var(--text-muted); margin: 20px 0; cursor: pointer; }
-        .star-rating i.active { color: #f59e0b; }
-        textarea { width: 100%; height: 100px; padding: 12px; border-radius: 10px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); outline: none; margin-bottom: 20px; }
-        .btn-submit { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary-gradient); color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; }
-        .alert-success { background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); padding: 12px; border-radius: 10px; margin-bottom: 15px; }
-        .alert-error { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 12px; border-radius: 10px; margin-bottom: 15px; }
+        .star-box i {
+            transition: all 0.2s ease;
+        }
+        .star-box i.active {
+            color: #f59e0b;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="container">
-    <div class="card">
-        <h2>⭐ Rate Your Trip Experience</h2>
-        <p style="color:var(--text-muted); font-size:14px;">Help build trust in the FlexiRide community!</p>
+<main class="page-content" style="padding: 40px 0;">
+    <div class="fr-container-sm">
+        <div class="fr-card" style="max-width: 500px; margin: 0 auto; text-align: center;">
+            <div style="font-size: 40px; margin-bottom: 8px;">⭐</div>
+            <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">
+                Rate Your Trip Experience
+            </h2>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px;">
+                Your honest feedback maintains the campus Trust Shield and commuter safety score.
+            </p>
 
-        <?php if ($successMessage): ?>
-            <div class="alert-success"><?php echo htmlspecialchars($successMessage); ?></div>
-            <a href="my_booked_rides.php" class="btn-submit" style="display:block; text-decoration:none;">Back to Booked Trips</a>
-        <?php else: ?>
-            <?php if ($errorMessage): ?>
-                <div class="alert-error"><?php echo htmlspecialchars($errorMessage); ?></div>
-            <?php endif; ?>
-
-            <form method="POST">
-                <input type="hidden" name="rating" id="ratingVal" value="5">
-                <div class="star-rating" id="stars">
-                    <i class='bx bxs-star active' data-val="1"></i>
-                    <i class='bx bxs-star active' data-val="2"></i>
-                    <i class='bx bxs-star active' data-val="3"></i>
-                    <i class='bx bxs-star active' data-val="4"></i>
-                    <i class='bx bxs-star active' data-val="5"></i>
+            <?php if ($successMessage): ?>
+                <div style="background:var(--eco-bg); color:var(--eco); border:1px solid var(--eco-border); padding:16px; border-radius:var(--radius-md); margin-bottom:20px; font-weight:700;">
+                    ✅ <?php echo htmlspecialchars($successMessage); ?>
                 </div>
+                <a href="my_booked_rides.php" class="fr-btn fr-btn-primary fr-btn-block">Back to My Bookings</a>
+            <?php else: ?>
+                <?php if ($errorMessage): ?>
+                    <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px; border-radius:var(--radius-md); margin-bottom:18px; font-size:14px;">
+                        ⚠️ <?php echo htmlspecialchars($errorMessage); ?>
+                    </div>
+                <?php endif; ?>
 
-                <textarea name="comment" placeholder="Write a short review (e.g. Safe driving, punctual, helmet provided)..."></textarea>
-                <button type="submit" class="btn-submit">Submit Rating & Review</button>
-            </form>
-        <?php endif; ?>
+                <form method="POST">
+                    <input type="hidden" name="rating" id="ratingVal" value="5">
+                    
+                    <div class="star-box" id="stars">
+                        <i class='bx bxs-star active' data-val="1"></i>
+                        <i class='bx bxs-star active' data-val="2"></i>
+                        <i class='bx bxs-star active' data-val="3"></i>
+                        <i class='bx bxs-star active' data-val="4"></i>
+                        <i class='bx bxs-star active' data-val="5"></i>
+                    </div>
+
+                    <div class="fr-form-group" style="text-align:left;">
+                        <label class="fr-label">Comments & Commendations (Optional)</label>
+                        <textarea name="comment" class="fr-textarea" placeholder="e.g. Prompt departure, smooth driving, spare helmet provided..." rows="3"></textarea>
+                    </div>
+
+                    <button type="submit" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg">
+                        Submit Review & Rating <i class='bx bx-check'></i>
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
     </div>
-</div>
+</main>
 
 <script>
     const stars = document.querySelectorAll('#stars i');
@@ -124,5 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         });
     });
 </script>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>
