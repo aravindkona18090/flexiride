@@ -26,6 +26,9 @@ if ($nStmt) {
 }
 ?>
 
+<!-- Boxicons Icons CDN with Fallback -->
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+<link href='https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 <script src="<?php echo $navRel; ?>assets/js/theme.js?v=<?php echo time(); ?>"></script>
 
 <style>
