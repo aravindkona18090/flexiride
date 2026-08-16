@@ -1,6 +1,5 @@
 <?php
 include_once __DIR__ . '/includes/db.php';
-session_start();
 include_once __DIR__ . '/includes/mailer.php';
 
 function sendOtpEmail($toEmail, $otp) {
