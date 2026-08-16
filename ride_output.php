@@ -1,6 +1,5 @@
 <?php
 include_once __DIR__ . '/includes/db.php';
-session_start();
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -76,91 +75,92 @@ $waShareUrl = "https://api.whatsapp.com/send?text=" . urlencode($waText);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fare Confirmation & Route Preview - FlexiRide</title>
+    <title>Review & Publish Ride — FlexiRide</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: var(--bg-color) !important; color: var(--text-color) !important; min-height: 100vh; display: flex; flex-direction: column; }
-
-        .container { max-width: 800px; margin: 40px auto; padding: 0 20px; width: 100%; }
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 24px;
-            padding: 35px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-
-        h2 { font-size: 26px; text-align: center; margin-bottom: 25px; color: var(--text-color); }
-
-        .fare-badge {
-            background: rgba(34, 197, 94, 0.15);
-            border: 1px solid var(--success-color);
-            border-radius: 16px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
-        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
-        .summary-item { background: var(--input-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--input-border); }
-        .summary-item label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px; }
-        .summary-item span { font-size: 16px; font-weight: 600; color: var(--text-color); }
-
-        .btn-confirm {
-            width: 100%; padding: 16px; border: none; border-radius: 12px;
-            background: var(--primary-gradient);
-            color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s;
-        }
-        .btn-wa-share {
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%; padding: 14px; border-radius: 12px;
-            background: #25D366; color: white; font-weight: 700; font-size: 15px; text-decoration: none; margin-top: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/flexiride.css">
 </head>
 <body>
 
 <?php include_once __DIR__ . '/includes/navbar.php'; ?>
 
-<div class="container">
-    <div class="card">
-        <h2>⚡ Win-Win Fare Calculation & Route Confirmation</h2>
-
-        <?php if (!empty($error)): ?>
-            <div style="background:var(--danger-bg); color:var(--danger-color); border:1px solid var(--danger-color); padding:12px; border-radius:10px; margin-bottom:20px; text-align:center; font-weight:600; font-size:14px;">
-                <?php echo htmlspecialchars($error); ?>
+<main class="page-content" style="padding: 40px 0;">
+    <div class="fr-container-sm">
+        <div class="fr-card" style="max-width: 620px; margin: 0 auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <span class="fr-badge fr-badge-eco"><i class='bx bxs-check-shield'></i> Fair Cost Split</span>
+                <span class="fr-badge fr-badge-primary">Estimated <?php echo $distance_km; ?> km</span>
             </div>
-        <?php endif; ?>
 
-        <div class="fare-badge">
-            <label style="font-size:14px; color:var(--text-muted); display:block;">Suggested Win-Win Fair Fare (Per Seat)</label>
-            <div style="font-size:36px; font-weight:800; color:var(--success-color); margin:6px 0;">₹<?php echo $suggested_fare; ?></div>
-            <p style="font-size:13px; color:var(--text-muted);">
-                Distance: <strong><?php echo $distance_km; ?> km</strong> | Total Route Fuel Cost: ₹<?php echo $total_fuel_cost; ?>
+            <h2 style="font-size:24px; font-weight:800; color:var(--text-main); margin-bottom:6px;">
+                Trip & Fare Review
+            </h2>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">
+                Confirm your ride details and passenger contribution before publishing.
             </p>
+
+            <?php if (!empty($error)): ?>
+                <div style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:20px; font-size:14px; font-weight:600;">
+                    ⚠️ <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Fair-Share Fare Tag -->
+            <div class="fair-fare-meter" style="margin-bottom: 20px;">
+                <div>
+                    <div class="fare-subtext">Suggested Fair Contribution per Seat</div>
+                    <div class="fare-amount">₹<?php echo $suggested_fare; ?></div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:12px; color:var(--text-muted);">Route Fuel Cost: ₹<?php echo $total_fuel_cost; ?></div>
+                    <div style="font-size:11.5px; color:var(--eco); font-weight:700; margin-top:2px;">50% Driver / 50% Passenger Split</div>
+                </div>
+            </div>
+
+            <!-- Route Nodes -->
+            <div style="background:var(--bg-input); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px; margin-bottom:20px;">
+                <div class="wayfinder-route" style="margin: 0 0 14px 0;">
+                    <div class="route-stop origin">
+                        <div class="stop-beacon"></div>
+                        <div class="stop-label">Pickup Location</div>
+                        <div class="stop-name"><?php echo htmlspecialchars($origin); ?></div>
+                    </div>
+                    <?php if (!empty($via_route_name)): ?>
+                        <div class="route-stop waypoint">
+                            <div class="stop-beacon"></div>
+                            <div class="stop-label">Corridor Waypoint</div>
+                            <div class="stop-name" style="font-size:13.5px; color:var(--primary);">Via <?php echo htmlspecialchars($via_route_name); ?></div>
+                        </div>
+                    <?php endif; ?>
+                    <div class="route-stop destination">
+                        <div class="stop-beacon"></div>
+                        <div class="stop-label">Dropoff Location</div>
+                        <div class="stop-name"><?php echo htmlspecialchars($destination); ?></div>
+                    </div>
+                </div>
+
+                <div class="fr-grid-2" style="border-top:1px solid var(--border-subtle); padding-top:12px; font-size:13px; color:var(--text-muted);">
+                    <div>📅 <?php echo $ride_date; ?> at <?php echo $ride_time; ?></div>
+                    <div>🏎️ <?php echo htmlspecialchars($vehicle_model); ?></div>
+                    <div>💺 <?php echo $seats_available; ?> Seat(s) Available</div>
+                    <div>🪖 <?php echo $helmet_provided ? 'Spare Helmet Provided' : 'Bring Own Helmet'; ?></div>
+                </div>
+            </div>
+
+            <form method="POST">
+                <input type="hidden" name="final_price" value="<?php echo $suggested_fare; ?>">
+                <button type="submit" name="confirm_post" class="fr-btn fr-btn-primary fr-btn-block fr-btn-lg" style="margin-bottom: 12px;">
+                    Publish Ride to Marketplace <i class='bx bx-check-circle'></i>
+                </button>
+            </form>
+
+            <a href="<?php echo $waShareUrl; ?>" target="_blank" class="fr-btn fr-btn-eco fr-btn-block">
+                <i class='bx bxl-whatsapp' style="font-size:20px;"></i> Share Preview to WhatsApp Campus Groups
+            </a>
         </div>
-
-        <div class="summary-grid">
-            <div class="summary-item"><label>📍 Pickup Location</label><span><?php echo htmlspecialchars($origin); ?></span></div>
-            <div class="summary-item"><label>🏁 Drop Location</label><span><?php echo htmlspecialchars($destination); ?></span></div>
-            <div class="summary-item"><label>📅 Date & Time</label><span><?php echo $ride_date; ?> at <?php echo $ride_time; ?></span></div>
-            <div class="summary-item"><label>🚘 Vehicle Model</label><span><?php echo htmlspecialchars($vehicle_model); ?></span></div>
-            <div class="summary-item"><label>💺 Seats Offered</label><span><?php echo $seats_available; ?> Seat(s)</span></div>
-            <div class="summary-item"><label>🪖 Helmet Provided</label><span><?php echo $helmet_provided ? 'Yes (Spare Helmet Provided)' : 'Bring Own'; ?></span></div>
-        </div>
-
-        <form method="POST">
-            <input type="hidden" name="final_price" value="<?php echo $suggested_fare; ?>">
-            <button type="submit" name="confirm_post" class="btn-confirm">Publish Ride & Save Offer →</button>
-        </form>
-
-        <a href="<?php echo $waShareUrl; ?>" target="_blank" class="btn-wa-share">
-            <i class='bx bxl-whatsapp' style="font-size:20px;"></i> Share Trip Preview on WhatsApp
-        </a>
     </div>
-</div>
+</main>
+
+<?php include_once __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>
