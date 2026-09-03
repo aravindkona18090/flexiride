@@ -26,10 +26,10 @@ RUN if [ -f "composer.json" ]; then composer install --no-dev --optimize-autoloa
 # Set appropriate permissions for web server
 RUN chown -R www-data:www-data /var/www/html
 
-# Configure Apache to listen on Render's dynamic PORT (defaults to 80 if not set)
-RUN sed -i 's/Listen 80/Listen ${PORT:-80}/' /etc/apache2/ports.conf && \
-    sed -i 's/:80/:${PORT:-80}/' /etc/apache2/sites-available/000-default.conf
+# Copy and setup runtime entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80
 
-CMD ["apache2-foreground"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
