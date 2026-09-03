@@ -41,6 +41,11 @@ if (isset($_SESSION['user_id'])) {
 }
 ?>
 
+<!-- Official FlexiRide Branded Favicon -->
+<link rel="icon" type="image/png" href="<?php echo $navRel; ?>images/logo.png">
+<link rel="shortcut icon" href="<?php echo $navRel; ?>favicon.ico">
+<link rel="apple-touch-icon" href="<?php echo $navRel; ?>images/logo.png">
+
 <!-- Boxicons Icons CDN with Fallback -->
 <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 <link href='https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
@@ -239,7 +244,7 @@ if (isset($_SESSION['user_id'])) {
 <header class="fr-navbar-wrap">
     <div class="fr-navbar">
         <a href="<?php echo $navRel; ?>index.php" class="fr-brand">
-            <div class="brand-logo-glow"><i class='bx bxs-bolt'></i></div>
+            <img src="<?php echo $navRel; ?>images/logo.png" alt="FlexiRide" style="width:36px; height:36px; object-fit:contain; border-radius:8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));">
             <div>Flexi<span>Ride</span></div>
         </a>
 

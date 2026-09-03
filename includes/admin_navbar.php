@@ -26,6 +26,11 @@ if ($nStmt) {
 }
 ?>
 
+<!-- Official FlexiRide Branded Favicon -->
+<link rel="icon" type="image/png" href="<?php echo $navRel; ?>images/logo.png">
+<link rel="shortcut icon" href="<?php echo $navRel; ?>favicon.ico">
+<link rel="apple-touch-icon" href="<?php echo $navRel; ?>images/logo.png">
+
 <!-- Boxicons Icons CDN with Fallback -->
 <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 <link href='https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
@@ -259,7 +264,7 @@ if ($nStmt) {
 
 <nav class="admin-navbar">
     <a href="<?php echo $adminRel; ?>admin_dashboard.php" class="admin-brand">
-        <span class="admin-brand-badge"><i class='bx bxs-shield-quarter'></i></span>
+        <img src="<?php echo $navRel; ?>images/logo.png" alt="FlexiRide" style="width:32px; height:32px; object-fit:contain; border-radius:6px;">
         <span class="admin-brand-text">Flexi<span>Ride</span></span>
         <span class="admin-role-tag">Admin</span>
     </a>
