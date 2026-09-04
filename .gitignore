@@ -9,6 +9,9 @@
 /images/*.png
 /images/*.gif
 /images/*.webp
+!images/logo*.png
+!images/logo*.jpg
+!images/2logo.*
 
 # Environment secrets
 .env
