@@ -67,4 +67,10 @@ if (!function_exists('syncUser3NF')) {
         }
     }
 }
+
+// Auto-heal missing columns across database tables
+if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
+    safeAddColumn($conn, 'vehicles', 'total_seats', 'INT NOT NULL DEFAULT 2');
+    safeAddColumn($conn, 'vehicles', 'vehicle_type', 'VARCHAR(50) DEFAULT "bike"');
+}
 ?>
