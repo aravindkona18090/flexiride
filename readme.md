@@ -79,7 +79,7 @@ The platform is deployed globally on **Render** with dynamic port management, ze
 | **Containerization** | Docker (`php:8.2-apache` base image with custom dynamic entrypoint) |
 | **Cloud Platform** | **Render** (Auto-deploy on git push, dynamic `$PORT` routing) |
 | **Typography & Icons**| Google Fonts (Outfit), Boxicons 2.1 |
-| **Notifications** | Resend API / PHPMailer, Twilio SMS API |
+| **Email & Alerts** | **Brevo HTTP API** (Transactional OTP & Notifications), Twilio SMS API |
 
 ---
 
@@ -151,6 +151,10 @@ FlexiRide/
    DB_PASS=
    DB_NAME=flexiride
    DB_PORT=3306
+
+   # Email Configuration (Brevo HTTP API)
+   BREVO_API_KEY=your_brevo_api_key_here
+   SENDER_EMAIL=flexiride247@gmail.com
    ```
 
 4. **Install Dependencies:**
