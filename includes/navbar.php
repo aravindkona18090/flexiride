@@ -98,8 +98,15 @@ if (isset($_SESSION['user_id'])) {
         font-size: 22px;
     }
     .fr-brand span {
-        color: var(--eco);
+        color: var(--primary);
+        transition: color 0.3s ease;
     }
+
+    .brand-logo-light { display: none !important; }
+    .brand-logo-dark { display: block !important; }
+
+    [data-theme="royal"] .brand-logo-dark { display: none !important; }
+    [data-theme="royal"] .brand-logo-light { display: block !important; }
 
     .fr-nav-menu {
         display: flex;
@@ -121,13 +128,14 @@ if (isset($_SESSION['user_id'])) {
         text-decoration: none;
     }
 
-    .fr-nav-link:hover, .fr-nav-link.active {
-        color: var(--text-main);
+    .fr-nav-link:hover {
+        color: var(--primary);
         background: var(--bg-surface-elevated);
     }
 
     .fr-nav-link.active {
         color: var(--primary);
+        background: var(--bg-surface-elevated);
     }
 
     .theme-selector {
@@ -244,7 +252,8 @@ if (isset($_SESSION['user_id'])) {
 <header class="fr-navbar-wrap">
     <div class="fr-navbar">
         <a href="<?php echo $navRel; ?>index.php" class="fr-brand">
-            <img src="<?php echo $navRel; ?>images/logo_dark.png" alt="FlexiRide" style="width:40px; height:40px; object-fit:contain; border-radius:10px; filter: drop-shadow(0 2px 8px rgba(2,132,199,0.3));">
+            <img src="<?php echo $navRel; ?>images/logo_dark.png" class="brand-logo-dark" alt="FlexiRide" style="width:40px; height:40px; object-fit:contain; border-radius:10px; filter: drop-shadow(0 2px 8px rgba(2,132,199,0.3));">
+            <img src="<?php echo $navRel; ?>images/logo_light.png" class="brand-logo-light" alt="FlexiRide" style="width:40px; height:40px; object-fit:contain; border-radius:10px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.1));">
             <div>Flexi<span>Ride</span></div>
         </a>
 

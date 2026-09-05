@@ -641,8 +641,15 @@ img {
     font-size: 20px;
 }
 .fr-brand span {
-    color: var(--eco);
+    color: var(--primary);
+    transition: color 0.3s ease;
 }
+
+.brand-logo-light { display: none !important; }
+.brand-logo-dark { display: block !important; }
+
+[data-theme="royal"] .brand-logo-dark { display: none !important; }
+[data-theme="royal"] .brand-logo-light { display: block !important; }
 
 .fr-nav-menu {
     display: flex;
@@ -663,13 +670,14 @@ img {
     gap: 6px;
 }
 
-.fr-nav-link:hover, .fr-nav-link.active {
-    color: var(--text-main);
+.fr-nav-link:hover {
+    color: var(--primary);
     background: var(--bg-surface-elevated);
 }
 
 .fr-nav-link.active {
     color: var(--primary);
+    background: var(--bg-surface-elevated);
 }
 
 /* Mobile Commute Bottom Dock */
