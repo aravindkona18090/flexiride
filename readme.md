@@ -20,6 +20,7 @@
       <img src="https://img.shields.io/badge/Live%20Demo-flexiride--pnnz.onrender.com-success?style=for-the-badge&logo=render&logoColor=white" alt="Live Demo">
     </a>
   </p>
+  <p><strong>🌐 Live Application:</strong> <a href="https://flexiride-pnnz.onrender.com/">https://flexiride-pnnz.onrender.com/</a></p>
 </div>
 
 ---
@@ -159,6 +160,8 @@ FlexiRide/
 
 5. **Launch Application:**
    Navigate to: `http://localhost/FlexiRide`
+
+> 💡 **Prefer not to set up locally?** Test the production deployment directly at: **[https://flexiride-pnnz.onrender.com/](https://flexiride-pnnz.onrender.com/)**
 
 ---
 
