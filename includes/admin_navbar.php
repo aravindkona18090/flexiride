@@ -141,7 +141,13 @@ if ($nStmt) {
         color: var(--text-color);
         letter-spacing: -0.5px;
     }
-    .admin-brand-text span { color: var(--primary-color); }
+    .admin-brand-text span { color: var(--primary-color); transition: color 0.3s ease; }
+
+    .brand-logo-light { display: none !important; }
+    .brand-logo-dark { display: block !important; }
+
+    [data-theme="royal"] .brand-logo-dark { display: none !important; }
+    [data-theme="royal"] .brand-logo-light { display: block !important; }
     .admin-role-tag {
         font-size: 10px;
         background: rgba(239, 68, 68, 0.15);
@@ -264,7 +270,8 @@ if ($nStmt) {
 
 <nav class="admin-navbar">
     <a href="<?php echo $adminRel; ?>admin_dashboard.php" class="admin-brand">
-        <img src="<?php echo $navRel; ?>images/logo_dark.png" alt="FlexiRide" style="width:36px; height:36px; object-fit:contain; border-radius:8px;">
+        <img src="<?php echo $navRel; ?>images/logo_dark.png" class="brand-logo-dark" alt="FlexiRide" style="width:36px; height:36px; object-fit:contain; border-radius:8px;">
+        <img src="<?php echo $navRel; ?>images/logo_light.png" class="brand-logo-light" alt="FlexiRide" style="width:36px; height:36px; object-fit:contain; border-radius:8px;">
         <span class="admin-brand-text">Flexi<span>Ride</span></span>
         <span class="admin-role-tag">Admin</span>
     </a>
