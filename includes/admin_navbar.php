@@ -266,6 +266,24 @@ if ($nStmt) {
         background: rgba(56, 189, 248, 0.15);
         color: var(--primary-color) !important;
     }
+
+    @media (max-width: 860px) {
+        .admin-navbar {
+            flex-wrap: wrap;
+            padding: 10px 14px;
+            gap: 10px;
+        }
+        .admin-nav-menu {
+            overflow-x: auto;
+            width: 100%;
+            padding-bottom: 6px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .admin-nav-menu::-webkit-scrollbar {
+            display: none;
+        }
+    }
 </style>
 
 <nav class="admin-navbar">
