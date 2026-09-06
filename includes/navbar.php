@@ -236,6 +236,41 @@ if (isset($_SESSION['user_id'])) {
         box-shadow: 0 0 8px #ef4444;
     }
 
+    .fr-navbar-mobile-actions {
+        display: none;
+        align-items: center;
+        gap: 8px;
+    }
+    .theme-selector-mobile {
+        background: var(--bg-input);
+        color: var(--text-main);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-pill);
+        padding: 5px 8px;
+        font-size: 13px;
+        outline: none;
+        cursor: pointer;
+    }
+    .mobile-notif-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--bg-surface-elevated);
+        border: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: var(--text-main);
+        position: relative;
+        text-decoration: none;
+    }
+    @media (max-width: 860px) {
+        .fr-navbar-mobile-actions {
+            display: flex;
+        }
+    }
+
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-6px); }
         to { opacity: 1; transform: translateY(0); }
@@ -256,6 +291,24 @@ if (isset($_SESSION['user_id'])) {
             <img src="<?php echo $navRel; ?>images/logo_light.png" class="brand-logo-light" alt="FlexiRide" style="width:40px; height:40px; object-fit:contain; border-radius:10px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.1));">
             <div>Flexi<span>Ride</span></div>
         </a>
+
+        <!-- 📱 Mobile Top Header Actions -->
+        <div class="fr-navbar-mobile-actions">
+            <select class="theme-selector-mobile" onchange="changeTheme(this.value)" aria-label="Theme Selector">
+                <option value="slate">🌌</option>
+                <option value="emerald">💚</option>
+                <option value="cyberpunk">💜</option>
+                <option value="royal">☀️</option>
+            </select>
+            <?php if (isset($_SESSION['user_id'])): ?>
+                <a href="<?php echo $navRel; ?>notifications.php" class="mobile-notif-btn" title="Notifications">
+                    <i class='bx bxs-bell'></i>
+                    <?php if ($navUnreadCount > 0): ?><span class="nav-unread-dot" style="position:absolute; top:6px; right:6px;"></span><?php endif; ?>
+                </a>
+            <?php else: ?>
+                <a href="<?php echo $navRel; ?>login.php" class="fr-btn fr-btn-primary fr-btn-sm" style="padding: 5px 12px; font-size: 12px;">Login</a>
+            <?php endif; ?>
+        </div>
 
         <ul class="fr-nav-menu" id="navLinks">
             <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
