@@ -263,11 +263,125 @@ if (isset($_SESSION['user_id'])) {
         font-size: 18px;
         color: var(--text-main);
         position: relative;
-        text-decoration: none;
+    .mobile-hamburger-btn {
+        display: none;
+        background: var(--bg-surface-elevated);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-main);
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        cursor: pointer;
+        transition: all 0.2s ease;
     }
+
+    .mobile-nav-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 10000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+    .mobile-nav-drawer.open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .mobile-drawer-content {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 84%;
+        max-width: 320px;
+        height: 100%;
+        background: var(--bg-surface-elevated);
+        border-left: 1px solid var(--border-subtle);
+        padding: 20px;
+        overflow-y: auto;
+        transform: translateX(100%);
+        transition: transform 0.28s cubic-bezier(0.33, 1, 0.68, 1);
+        box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    }
+    .mobile-nav-drawer.open .mobile-drawer-content {
+        transform: translateX(0);
+    }
+    .mobile-drawer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--border-subtle);
+        margin-bottom: 16px;
+    }
+    .mobile-drawer-close {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 26px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+    }
+    .mobile-drawer-links {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 0;
+        margin: 0;
+    }
+    .mobile-drawer-links a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 14px;
+        border-radius: var(--radius-md);
+        color: var(--text-main);
+        font-size: 14.5px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .mobile-drawer-links a:hover, .mobile-drawer-links a.active {
+        background: var(--bg-input);
+        color: var(--primary);
+    }
+    .drawer-divider {
+        height: 1px;
+        background: var(--border-subtle);
+        margin: 8px 0;
+    }
+
     @media (max-width: 860px) {
+        .fr-nav-menu {
+            display: none !important;
+        }
         .fr-navbar-mobile-actions {
-            display: flex;
+            display: flex !important;
+        }
+        .mobile-hamburger-btn {
+            display: flex !important;
+        }
+        .fr-navbar {
+            height: 60px !important;
+            padding: 0 14px !important;
+        }
+        .fr-brand {
+            font-size: 18px !important;
+            gap: 8px !important;
+        }
+        .fr-brand img {
+            width: 34px !important;
+            height: 34px !important;
         }
     }
 
@@ -305,9 +419,10 @@ if (isset($_SESSION['user_id'])) {
                     <i class='bx bxs-bell'></i>
                     <?php if ($navUnreadCount > 0): ?><span class="nav-unread-dot" style="position:absolute; top:6px; right:6px;"></span><?php endif; ?>
                 </a>
-            <?php else: ?>
-                <a href="<?php echo $navRel; ?>login.php" class="fr-btn fr-btn-primary fr-btn-sm" style="padding: 5px 12px; font-size: 12px;">Login</a>
             <?php endif; ?>
+            <button type="button" class="mobile-hamburger-btn" onclick="toggleMobileDrawer()" aria-label="Open Navigation Menu">
+                <i class='bx bx-menu'></i>
+            </button>
         </div>
 
         <ul class="fr-nav-menu" id="navLinks">
@@ -372,6 +487,47 @@ if (isset($_SESSION['user_id'])) {
             <?php endif; ?>
         </ul>
     </div>
+
+    <!-- 📱 Mobile Slide-Down Drawer -->
+    <div class="mobile-nav-drawer" id="mobileDrawer" onclick="if(event.target === this) toggleMobileDrawer()">
+        <div class="mobile-drawer-content">
+            <div class="mobile-drawer-header">
+                <div class="fr-brand">
+                    <img src="<?php echo $navRel; ?>images/logo_dark.png" class="brand-logo-dark" alt="FlexiRide" style="width:32px; height:32px; object-fit:contain; border-radius:8px;">
+                    <img src="<?php echo $navRel; ?>images/logo_light.png" class="brand-logo-light" alt="FlexiRide" style="width:32px; height:32px; object-fit:contain; border-radius:8px;">
+                    <div style="font-size:18px;">Flexi<span>Ride</span></div>
+                </div>
+                <button type="button" class="mobile-drawer-close" onclick="toggleMobileDrawer()" aria-label="Close Menu"><i class='bx bx-x'></i></button>
+            </div>
+
+            <ul class="mobile-drawer-links">
+                <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true): ?>
+                    <li><a href="<?php echo $adminRel; ?>admin_dashboard.php"><i class='bx bxs-dashboard'></i> Dashboard</a></li>
+                    <li><a href="<?php echo $adminRel; ?>admin_manage_users.php"><i class='bx bxs-user-account'></i> Users</a></li>
+                    <li><a href="<?php echo $adminRel; ?>admin_verify_docs.php"><i class='bx bxs-file-find'></i> Verification</a></li>
+                    <li><a href="<?php echo $adminRel; ?>admin_sos_logs.php"><i class='bx bxs-alarm-exclamation'></i> SOS</a></li>
+                <?php else: ?>
+                    <li><a href="<?php echo $navRel; ?>index.php" class="<?php echo ($currentScript === 'index.php') ? 'active' : ''; ?>"><i class='bx bxs-home-smile'></i> Home</a></li>
+                    <li><a href="<?php echo $navRel; ?>find_ride.php" class="<?php echo ($currentScript === 'find_ride.php') ? 'active' : ''; ?>"><i class='bx bx-search'></i> Find Ride</a></li>
+                    <li><a href="<?php echo $navRel; ?>post_ride.php" class="<?php echo ($currentScript === 'post_ride.php') ? 'active' : ''; ?>"><i class='bx bx-plus-circle'></i> Post a Ride</a></li>
+                    <li><a href="<?php echo $navRel; ?>about.php" class="<?php echo ($currentScript === 'about.php') ? 'active' : ''; ?>"><i class='bx bx-info-circle'></i> About FlexiRide</a></li>
+                <?php endif; ?>
+
+                <?php if (isset($_SESSION['user_id'])): ?>
+                    <li class="drawer-divider"></li>
+                    <li><a href="<?php echo $navRel; ?>profile.php" class="<?php echo ($currentScript === 'profile.php') ? 'active' : ''; ?>"><i class='bx bxs-user-circle'></i> My Profile</a></li>
+                    <li><a href="<?php echo $navRel; ?>myrides.php" class="<?php echo ($currentScript === 'myrides.php') ? 'active' : ''; ?>"><i class='bx bxs-car'></i> Offered Rides</a></li>
+                    <li><a href="<?php echo $navRel; ?>my_booked_rides.php" class="<?php echo ($currentScript === 'my_booked_rides.php') ? 'active' : ''; ?>"><i class='bx bxs-receipt'></i> Booked Trips</a></li>
+                    <li><a href="<?php echo $navRel; ?>danger.php" style="color:var(--danger) !important;"><i class='bx bxs-alarm-exclamation'></i> Emergency SOS</a></li>
+                    <li class="drawer-divider"></li>
+                    <li><a href="<?php echo $navRel; ?>logout.php" style="color:var(--danger) !important;"><i class='bx bx-log-out'></i> Logout</a></li>
+                <?php else: ?>
+                    <li class="drawer-divider"></li>
+                    <li><a href="<?php echo $navRel; ?>login.php" class="fr-btn fr-btn-primary fr-btn-block" style="justify-content:center;"><i class='bx bx-log-in'></i> Login / Register</a></li>
+                <?php endif; ?>
+            </ul>
+        </div>
+    </div>
 </header>
 
 <!-- 📱 Fixed Mobile Ergonomic Commute Dock (Visible on Mobile Screens) -->
@@ -402,6 +558,14 @@ if (isset($_SESSION['user_id'])) {
         e.stopPropagation();
         const menu = document.getElementById('profileMenu');
         if (menu) menu.classList.toggle('show');
+    }
+
+    function toggleMobileDrawer() {
+        const drawer = document.getElementById('mobileDrawer');
+        if (drawer) {
+            drawer.classList.toggle('open');
+            document.body.style.overflow = drawer.classList.contains('open') ? 'hidden' : '';
+        }
     }
 
     document.addEventListener('click', function(e) {

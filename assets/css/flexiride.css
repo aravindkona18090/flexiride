@@ -688,7 +688,7 @@ img {
     left: 0;
     right: 0;
     height: var(--dock-height);
-    background: rgba(9, 13, 22, 0.95);
+    background: var(--bg-surface);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border-subtle);
@@ -735,13 +735,13 @@ img {
 
 @media (max-width: 860px) {
     .fr-nav-menu {
-        display: none;
+        display: none !important;
     }
     .mobile-commute-dock {
-        display: flex;
+        display: flex !important;
     }
     body {
-        padding-bottom: var(--dock-height);
+        padding-bottom: calc(var(--dock-height) + 12px) !important;
     }
 }
 
